@@ -1,5 +1,0 @@
-#ignore node modules
-node_modules/
-
-#ignoring environment variables
-.env
