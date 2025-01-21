@@ -1,10 +1,3 @@
-import { validationResult } from "express-validator";
-
-import Joi from 'joi'; // If using ES modules
-// const Joi = require('joi'); // If using CommonJS
-
-
-
 export const handleValidationErrors = (schema) => {
   return async (req, res, next) => {
       try {
