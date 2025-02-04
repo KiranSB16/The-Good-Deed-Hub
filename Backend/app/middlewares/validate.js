@@ -7,8 +7,6 @@ export const handleValidationErrors = (schema) => {
          
           next(); // Proceed to the next middleware/route handler
       } catch (error) {
-          console.error("Validation Error:", error);
-
           if (error.details && Array.isArray(error.details)) {
               // Extract detailed error messages
               const errorMessages = error.details.map(err => err.message).join(', ');

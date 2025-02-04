@@ -1,8 +1,6 @@
-import {Schema , model} from "mongoose"
+import mongoose, {Schema , model} from "mongoose"
 const fundraiserSchema = new Schema({
-  name : String,
-  email: String,
-  password : String,
+  userId : {type : mongoose.Schema.Types.ObjectId , ref : "User"},
   profileImage : [String],
   mobileNumber : Number,
   causes: [

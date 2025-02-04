@@ -4,7 +4,6 @@ const authorizeUser = (permittedRoles) => {
         console.log("User not authenticated."); // Debug log
         return res.status(401).json({ errors: "User not authenticated" });
       }
-  
       console.log("User Role:", req.user.role); // Debug log
       if (permittedRoles.includes(req.user.role)) {
         return next();

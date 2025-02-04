@@ -20,6 +20,7 @@ try{
         if (userCount == 0) {
             user.role = 'admin';
         }
+
     await user.save()
     res.status(201).json(user)
 } catch(err){
@@ -53,7 +54,7 @@ userCltr.login = async(req , res) => {
 
 userCltr.profile = async (req , res) => {
     try{
-        const user = await User.findById(req.userId)
+        const user = await User.findById(req.user.userId)
         res.json(user)
     } catch(err) {
         console.log(err)

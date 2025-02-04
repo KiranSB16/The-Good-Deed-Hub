@@ -2,41 +2,25 @@ import Cause from "../models/cause-model.js";
 const causeCltr = {}
 
 causeCltr.create = async (req, res) => {
+  const { title, description, goalAmount, category, startDate, endDate } = req.body;
   try {
 
-    if (!req.user || !req.user.userId) {
-      return res.status(403).json({ message: "Unauthorized. Invalid user session." });
-    }
-
-    const { title, description, goalAmount, category, startDate, endDate } = req.body;
-
-    // Check if a similar cause already exists (using title and description for uniqueness)
-    const existingCause = await Cause.findOne({
-      title: title.trim(),
-      description: description.trim()
-    });
-
-    if (existingCause) {
-      return res.status(400).json({ message: "A similar cause already exists. Please modify the details." });
-    }
-
     const newCause = new Cause({
-      title: title.trim(),
-      description: description.trim(),
+      title,
+      description,
       goalAmount,
       category,
       startDate,
       endDate,
-      fundraiserId: req.user.userId, // Use userId from req.user
+      fundraiserId: req.user.userId,
     });
-
+    
     await newCause.save();
-    res.status(201).json({ message: "Cause created successfully", cause: newCause });
+    res.status(201).json({ message: "Cause created successfully. Awaiting admin approval.", cause: newCause });
   } catch (error) {
-    res.status(500).json({ message: "Failed to create cause", error: error.message });
+    res.status(500).json({ message: "Failed to create cause.", error: error.message });
   }
 };
-
 
 causeCltr.list = async (req, res) => {
   try {
@@ -44,8 +28,7 @@ causeCltr.list = async (req, res) => {
     const causes = await Cause.find().populate("fundraiserId", "name email");
 
     // Format the response with serial numbers
-    const response = causes.map((cause, index) => ({
-      serialNumber: index + 1,
+    const response = causes.map((cause) => ({
       id: cause._id,
       title: cause.title,
       description: cause.description,

@@ -8,7 +8,12 @@ import {createCauseValidation} from "../validators/cause-validation-schema.js"
 
 const router = express.Router();
 
-router.post('/causes', AuthenticateUser, authorizeUser(['fundraiser']), handleValidationErrors(createCauseValidation) , causeCltr.create)
+router.post('/causes', 
+  AuthenticateUser, 
+  authorizeUser(['fundraiser']),
+  handleValidationErrors(createCauseValidation) , 
+  causeCltr.create)
+
 router.get('/causes' , AuthenticateUser, causeCltr.list)
 router.get("/causes/:id", AuthenticateUser, causeCltr.show)
 router.put("/causes/:id",AuthenticateUser , authorizeUser(['admin' , 'fundraiser']) ,causeCltr.update )

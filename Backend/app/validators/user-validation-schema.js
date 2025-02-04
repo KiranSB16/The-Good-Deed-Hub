@@ -71,6 +71,21 @@ export const userRegisterSchema = {
           options: [["donor", "fundraiser", "admin"]],
           errorMessage: "Role must be one of: donor, fundraiser, or admin",
         },
+        custom:{
+            options: async function(value){
+              if(value ==='admin'){
+                const user=await User.find()
+                const result=user.some((ele)=>{
+                 return ele.role == value
+             })
+             if(result){
+                 throw new Error('you cannot register as adim')
+             }else{
+                 return true
+             }
+            }
+            } 
+         },
         trim: true,
       },
     

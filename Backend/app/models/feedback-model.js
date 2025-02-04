@@ -1,11 +1,20 @@
-import {Schema , model} from "mongoose"
-const feedbackSchema = new Schema({
-  feedbackId: { type: mongoose.Schema.Types.ObjectId},
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User'},
-  causeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Cause' },
-  rating: { type: Number, min: 1, max: 5 },
-  comments:  String,
-} , {timestamps : true});
+import { Schema, model } from "mongoose";
 
-const Feedback = model('Feedback', feedbackSchema)
-export default Feedback
+const feedbackSchema = new Schema(
+  {
+    donorId: { type: Schema.Types.ObjectId, ref: "User", required: true }, // Donor giving feedback
+    causeId: { type: Schema.Types.ObjectId, ref: "Cause", required: true }, // Cause being reported
+    message: { type: String, required: true, minlength: 10 }, // Report message
+    status: {
+      type: String,
+      enum: ["pending", "reviewed", "action_required"],
+      default: "pending",
+    }, // Status of feedback
+    adminResponse: { type: String }, 
+    fundraiserResponse: { type: String }, // Fundraiser's response to the admin's query
+  },
+  { timestamps: true }
+);
+
+const Feedback = model("Feedback", feedbackSchema);
+export default Feedback;

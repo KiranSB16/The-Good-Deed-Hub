@@ -1,8 +1,7 @@
+import mongoose from "mongoose"
 import {Schema , model} from "mongoose"
 const donorSchema = new Schema({
-  name : String,
-  email: String,
-  password : String,
+  userId : {type : mongoose.Schema.Types.ObjectId , ref : "User"},
   profileImage : [String],
   totalDonations : Number,
   mobileNumber : Number,
