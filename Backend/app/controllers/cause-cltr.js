@@ -1,10 +1,31 @@
 import Cause from "../models/cause-model.js";
 const causeCltr = {}
+import cloudinary from "cloudinary"
 
 causeCltr.create = async (req, res) => {
-  const { title, description, goalAmount, category, startDate, endDate } = req.body;
   try {
+    const { title, description, goalAmount, category, startDate, endDate } = req.body;
+    console.log("Uploaded Files:", req.files);
+    console.log('Images:', req.files.images);
+    console.log('Documents:', req.files.documents);
 
+    // Upload images to Cloudinary
+    const imageUploadPromises = req.files.images?.map((file) =>
+      cloudinary.v2.uploader.upload(file.path, { folder: "causes/images" })
+    ) || [];
+
+    const documentUploadPromises = req.files.documents?.map((file) =>
+      cloudinary.v2.uploader.upload(file.path, { folder: "causes/documents", resource_type: "raw" })
+    ) || [];
+
+    // Resolve all the image and document uploads
+    const imageResults = await Promise.all(imageUploadPromises);
+    const documentResults = await Promise.all(documentUploadPromises);
+
+    // Extract URLs of the uploaded files
+    const imageUrls = imageResults.map((result) => result.secure_url);
+    const documentUrls = documentResults.map((result) => result.secure_url);
+    
     const newCause = new Cause({
       title,
       description,
@@ -13,6 +34,8 @@ causeCltr.create = async (req, res) => {
       startDate,
       endDate,
       fundraiserId: req.user.userId,
+      images:imageUrls,
+      documents:documentUrls,
     });
     
     await newCause.save();
@@ -27,25 +50,25 @@ causeCltr.list = async (req, res) => {
     // Fetch causes and populate fundraiser details
     const causes = await Cause.find().populate("fundraiserId", "name email");
 
-    // Format the response with serial numbers
-    const response = causes.map((cause) => ({
-      id: cause._id,
-      title: cause.title,
-      description: cause.description,
-      goalAmount: cause.goalAmount,
-      currentAmount: cause.currentAmount,
-      category: cause.category,
-      fundraiserId: cause.fundraiserId?._id || null, // Include fundraiser ID
-      fundraiserName: cause.fundraiserId?.name || "Unknown", // Include fundraiser name
-      fundraiserEmail: cause.fundraiserId?.email || "Unknown", // Include fundraiser email
-      status: cause.status,
-      startDate: cause.startDate,
-      endDate: cause.endDate,
-      createdAt: cause.createdAt,
-      updatedAt: cause.updatedAt,
-    }));
+    // // Format the response with serial numbers
+    // const response = causes.map((cause) => ({
+    //   id: cause._id,
+    //   title: cause.title,
+    //   description: cause.description,
+    //   goalAmount: cause.goalAmount,
+    //   currentAmount: cause.currentAmount,
+    //   category: cause.category,
+    //   fundraiserId: cause.fundraiserId?._id || null, // Include fundraiser ID
+    //   fundraiserName: cause.fundraiserId?.name || "Unknown", // Include fundraiser name
+    //   fundraiserEmail: cause.fundraiserId?.email || "Unknown", // Include fundraiser email
+    //   status: cause.status,
+    //   startDate: cause.startDate,
+    //   endDate: cause.endDate,
+    //   createdAt: cause.createdAt,
+    //   updatedAt: cause.updatedAt,
+    // }));
 
-    res.status(200).json(response);
+    res.status(200).json(causes);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch causes", error: error.message });
   }

@@ -3,7 +3,6 @@ import { checkSchema } from "express-validator"
 import { userLoginSchema, userRegisterSchema } from "../validators/user-validation-schema.js"
 import userCltr from "../controllers/user-cltr.js"
 import {AuthenticateUser} from "../middlewares/authentication.js"
-import authorizeUser from "../middlewares/authorization.js"
 const router = express.Router()
 
 router.post("/users/register" , checkSchema(userRegisterSchema), userCltr.register)

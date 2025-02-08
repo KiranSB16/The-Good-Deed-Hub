@@ -71,5 +71,5 @@ userCltr.all = async(req , res) => {
         res.status(500).json({errors : "something went wrong"})
     }
 }
-export default userCltr
 
+export default userCltr
