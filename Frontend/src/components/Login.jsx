@@ -1,105 +1,166 @@
-import { useState } from "react";
-//import {useNavigate} from "react-router-dom"
-import { useDispatch , useSelector } from "react-redux";
-import * as Yup from "yup";
-import { loginUser } from "../slices/userSlice";
-export default function Login() {
-    const [formData, setFormData] = useState({
-        email: "",
-        password: "",
-      });
-      //const navigate = useNavigate()
-      const dispatch = useDispatch()
-      const {data , serverErrors} = useSelector((state) => {
-        return state.users
-      })
-    
-      const [errors, setErrors] = useState({}) 
-      const validationSchema = Yup.object({
-        email: Yup.string()
-          .email("Invalid format")
-          .required("Email is Required"),
-        password: Yup.string()
-          .min(8, "Password must be minimum 8 characters long")
-          .matches(
-            /[!@#$%^&*(),.?":{}|<>]/,
-            "Password must contain at least one symbol"
-          )
-          .matches(/[0-9]/, "Password must contain at least one number")
-          .matches(/[A-Z]/, "Password must contain at least one uppercase letter")
-          .matches(/[a-z]/, "Password must contain at least one lowercase letter")
-          .required("Password is Required")
-      });
-    
-      const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-          await validationSchema.validate(formData, { abortEarly: false });
-          console.log("Form Submitted", formData);
-          dispatch(loginUser({formData}))
-          // navigate("/dashboard")
-        } catch (error) {
-          const newErrors = {};
-          error.inner.forEach((err) => {
-            newErrors[err.path] = err.message;
-          });
-          setErrors(newErrors);
-        }
-      };
-    
-      const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData({
-          ...formData,
-          [name]: value,
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { loginUser, clearError } from "../slices/userSlice";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
+import { toast } from "react-toastify";
+
+const validateEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+const validatePassword = (password) => {
+  // At least 1 lowercase, 1 uppercase, 1 number, 1 symbol
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+  return passwordRegex.test(password);
+};
+
+const Login = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  
+  const { loading, error, user } = useSelector((state) => state.user);
+
+  useEffect(() => {
+    dispatch(clearError());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (error) {
+      if (Array.isArray(error)) {
+        // Handle validation errors from backend
+        const errorMessages = error.map(err => err.msg).join(', ');
+        toast.error(errorMessages);
+      } else {
+        toast.error(error);
+      }
+    }
+  }, [error]);
+
+  useEffect(() => {
+    if (user) {
+      const role = user.role.toLowerCase();
+      console.log('Auth state updated - navigating to:', `/${role}`);
+      navigate(`/${role}`, { replace: true });
+    }
+  }, [user, navigate]);
+
+  const validateForm = () => {
+    const errors = {};
+
+    if (!email) {
+      errors.email = 'Email is required';
+    } else if (!validateEmail(email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+
+    if (!password) {
+      errors.password = 'Password is required';
+    } else if (!validatePassword(password)) {
+      errors.password = 'Password must contain at least 1 lowercase letter, 1 uppercase letter, 1 number, and 1 special character';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+        Object.values(validationErrors).forEach(error => {
+            toast.error(error);
         });
-      };
+        return;
+    }
 
-      // const resetForm = () => {
-      //   setFormData({
-      //     email : "",
-      //     password: ""
-      //   })
-      //   navigate("/dashboard")
-      // }
-    
-    return (
-    <>
-        <h1>Login</h1>
-        {serverErrors?.length > 0 && (
-      <div style={{ color: "red" }}>
-        <h3>Server Errors:</h3>
-        <ul>
-          {serverErrors.map((err, i) => (
-            <li key={i}>{err.msg}</li>
-          ))}
-        </ul>
-      </div>
-    )}
-        <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="email">Email</label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-          />
-          {errors.email && <div className="error" style={{color : "red"}}>{errors.email}</div>}
-        </div>
+    try {
+        dispatch(clearError());
+        const result = await dispatch(loginUser({ 
+            formData: { email, password } // Wrap in formData object
+        })).unwrap();
 
-        <div>
-          <label htmlFor="password">Password</label>
-          <input
-            type="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-          />
-          {errors.password && <div className="error" style={{color : "red"}}>{errors.password}</div>}
-        </div>
-        <button type="submit">login</button>
-        </form>
-    </>
-    )
+        if (result?.user) {
+            toast.success('Login successful!');
+        }
+        localStorage.setItem('token' , result.token)
+    } catch (err) {
+        console.error("Login error:", err);
+    }
 }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Login to The Good Deed Hub</CardTitle>
+          <CardDescription>
+            Enter your credentials to access your account
+          </CardDescription>
+        </CardHeader>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setValidationErrors(prev => ({ ...prev, email: '' }));
+                }}
+                required
+                disabled={loading}
+                autoComplete="email"
+                className={validationErrors.email ? 'border-red-500' : ''}
+              />
+              {validationErrors.email && (
+                <p className="text-sm text-red-500">{validationErrors.email}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setValidationErrors(prev => ({ ...prev, password: '' }));
+                }}
+                required
+                disabled={loading}
+                autoComplete="current-password"
+                className={validationErrors.password ? 'border-red-500' : ''}
+              />
+              {validationErrors.password && (
+                <p className="text-sm text-red-500">{validationErrors.password}</p>
+              )}
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={loading}
+            >
+              {loading ? 'Logging in...' : 'Login'}
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
+    </div>
+  );
+};
+
+export default Login;

@@ -1,4 +1,5 @@
-import Joi from "joi"
+import Joi from "joi";
+
 export const createCauseValidation = Joi.object({
   title: Joi.string().min(5).max(100).required().messages({
     'string.empty': 'Title is required',
@@ -21,8 +22,13 @@ export const createCauseValidation = Joi.object({
   category: Joi.string().required().messages({
     'string.empty': 'Category is required',
   }),
-  fundraiserId: Joi.string().optional()
+  fundraiserId: Joi.string().optional(),
+
+  // ✅ Allow images and documents as an array of strings (URLs)
+  images: Joi.array().items(Joi.string()).optional(),
+  documents: Joi.array().items(Joi.string()).optional()
 });
+
 export const updateCauseValidation = Joi.object({
   title: Joi.string().min(5).max(100).optional(),
   description: Joi.string().min(20).optional(),
@@ -30,6 +36,8 @@ export const updateCauseValidation = Joi.object({
   startDate: Joi.date().optional(),
   endDate: Joi.date().greater(Joi.ref('startDate')).optional(),
   category: Joi.string().optional(),
+
+  // ✅ Allow updating images and documents
+  images: Joi.array().items(Joi.string()).optional(),
+  documents: Joi.array().items(Joi.string()).optional()
 });
-
-

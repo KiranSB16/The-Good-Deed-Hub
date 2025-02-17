@@ -11,7 +11,7 @@ const causeSchema = new Schema({
   status: { type: String, enum: ['approved', 'rejected', 'pending approval'], default: 'pending approval' },
   rejectionMessage: { type: String, default: null },
   images: [String],
-  pdfDocument : [String],
+  documents : [String],
   shareLink: String,
   qrCode: String,
   startDate: Date ,

@@ -1,27 +1,28 @@
 import Cause from "../models/cause-model.js";
+import cloudinary from "../utils/cloudinary.js";
 const causeCltr = {}
-import cloudinary from "cloudinary"
+// import cloudinary from "cloudinary"
 
 causeCltr.create = async (req, res) => {
   try {
     const { title, description, goalAmount, category, startDate, endDate } = req.body;
-    console.log("Uploaded Files:", req.files);
-    console.log('Images:', req.files.images);
-    console.log('Documents:', req.files.documents);
-
-    // Upload images to Cloudinary
+    
     const imageUploadPromises = req.files.images?.map((file) =>
-      cloudinary.v2.uploader.upload(file.path, { folder: "causes/images" })
+      cloudinary.uploader.upload(file.path, { folder: "causes/images" })
     ) || [];
-
+    
+    
     const documentUploadPromises = req.files.documents?.map((file) =>
-      cloudinary.v2.uploader.upload(file.path, { folder: "causes/documents", resource_type: "raw" })
+      cloudinary.uploader.upload(file.path, { 
+        folder: "causes/documents", 
+        resource_type: "raw" 
+      })
     ) || [];
-
+    
     // Resolve all the image and document uploads
     const imageResults = await Promise.all(imageUploadPromises);
     const documentResults = await Promise.all(documentUploadPromises);
-
+    
     // Extract URLs of the uploaded files
     const imageUrls = imageResults.map((result) => result.secure_url);
     const documentUrls = documentResults.map((result) => result.secure_url);
@@ -34,14 +35,20 @@ causeCltr.create = async (req, res) => {
       startDate,
       endDate,
       fundraiserId: req.user.userId,
-      images:imageUrls,
-      documents:documentUrls,
+      images: imageUrls,
+      documents: documentUrls,
     });
     
     await newCause.save();
-    res.status(201).json({ message: "Cause created successfully. Awaiting admin approval.", cause: newCause });
+    res.status(201).json({ 
+      message: "Cause created successfully. Awaiting admin approval.", 
+      cause: newCause 
+    });
   } catch (error) {
-    res.status(500).json({ message: "Failed to create cause.", error: error.message });
+    res.status(500).json({ 
+      message: "Failed to create cause.", 
+      error: error.message 
+    });
   }
 };
 

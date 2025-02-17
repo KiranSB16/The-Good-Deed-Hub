@@ -1,23 +1,24 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
-import * as Yup from "yup";
+import { useDispatch } from "react-redux";
 import { registerUser } from "../slices/userSlice";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
+import * as Yup from "yup";
 
-export default function Register() {
+const Register = () => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     role: "",
   });
-
+  const [formErrors, setFormErrors] = useState({});
   const dispatch = useDispatch();
-  //const navigate = useNavigate();
-  const { serverErrors } = useSelector((state) => state.users);
-  const [errors, setErrors] = useState({});
+  const navigate = useNavigate();
 
-  
   const validationSchema = Yup.object({
     name: Yup.string().required("Name is Required"),
     email: Yup.string().email("Invalid format").required("Email is Required"),
@@ -31,21 +32,21 @@ export default function Register() {
       .matches(/[A-Z]/, "Password must contain at least one uppercase letter")
       .matches(/[a-z]/, "Password must contain at least one lowercase letter")
       .required("Password is Required"),
-    role: Yup.string().required("Role is required"),
+    role: Yup.string().required("Role is Required"),
   });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setErrors({});
     try {
       await validationSchema.validate(formData, { abortEarly: false });
-      dispatch(registerUser({ formData, resetForm }));
+      dispatch(registerUser({ formData }));
+      navigate("/login");
     } catch (error) {
       const newErrors = {};
       error.inner.forEach((err) => {
         newErrors[err.path] = err.message;
       });
-      setErrors(newErrors);
+      setFormErrors(newErrors);
     }
   };
 
@@ -57,109 +58,114 @@ export default function Register() {
     });
   };
 
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      email: "",
-      password: "",
-      role: "",
-    });
-  };
-
   return (
-    <>
-      <h1>Registration</h1>
-      {serverErrors?.length > 0 && (
-        <div style={{ color: "red" }}>
-          <h3>Server errors</h3>
-          <ul>
-            {serverErrors.map((err, i) => (
-              <li key={i}>{err.msg}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="name">Name</label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-          />
-          {errors.name && (
-            <div className="error" style={{ color: "red" }}>
-              {errors.name}
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl font-bold text-center">Create an account</CardTitle>
+          <CardDescription className="text-center">
+            Enter your details below to create your account
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                name="name"
+                type="text"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="Enter your name"
+                required
+              />
+              {formErrors.name && (
+                <p className="text-sm text-red-500">{formErrors.name}</p>
+              )}
             </div>
-          )}
-        </div>
-
-        <div>
-          <label htmlFor="email">Email</label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-          />
-          {errors.email && (
-            <div className="error" style={{ color: "red" }}>
-              {errors.email}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Enter your email"
+                required
+              />
+              {formErrors.email && (
+                <p className="text-sm text-red-500">{formErrors.email}</p>
+              )}
             </div>
-          )}
-        </div>
-
-        <div>
-          <label htmlFor="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            name="password"
-            value={formData.password}
-            onChange={handleChange}
-          />
-          {errors.password && (
-            <div className="error" style={{ color: "red" }}>
-              {errors.password}
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Enter your password"
+                required
+              />
+              {formErrors.password && (
+                <p className="text-sm text-red-500">{formErrors.password}</p>
+              )}
             </div>
-          )}
-        </div>
-
-        <div>
-          <label htmlFor="donor">
-            <input
-              type="radio"
-              value="donor"
-              onChange={handleChange}
-              checked={formData.role === "donor"}
-              id="donor"
-              name="role"
-            />
-            Donor
-          </label>
-          <label htmlFor="fundraiser">
-            <input
-              type="radio"
-              value="fundraiser"
-              onChange={handleChange}
-              checked={formData.role === "fundraiser"}
-              id="fundraiser"
-              name="role"
-            />
-            Fundraiser
-          </label>
-          {errors.role && (
-            <div className="error" style={{ color: "red" }}>
-              {errors.role}
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="donor"
+                    name="role"
+                    value="donor"
+                    checked={formData.role === "donor"}
+                    onChange={handleChange}
+                    className="h-4 w-4 border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <Label htmlFor="donor" className="cursor-pointer">Donor</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="radio"
+                    id="fundraiser"
+                    name="role"
+                    value="fundraiser"
+                    checked={formData.role === "fundraiser"}
+                    onChange={handleChange}
+                    className="h-4 w-4 border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <Label htmlFor="fundraiser" className="cursor-pointer">Fundraiser</Label>
+                </div>
+              </div>
+              {formErrors.role && (
+                <p className="text-sm text-red-500">{formErrors.role}</p>
+              )}
             </div>
-          )}
-        </div>
-
-        <button type="submit">Register</button>
-      </form>
-    </>
+            <Button type="submit" className="w-full">
+              Register
+            </Button>
+          </form>
+        </CardContent>
+        <CardFooter className="flex flex-col space-y-4">
+          <div className="text-sm text-center text-gray-500">
+            Already have an account?{" "}
+            <Button
+              variant="link"
+              className="p-0 h-auto font-semibold text-primary hover:text-primary/90"
+              onClick={() => navigate("/login")}
+            >
+              Sign in
+            </Button>
+          </div>
+        </CardFooter>
+      </Card>
+    </div>
   );
-}
+};
+
+export default Register;
