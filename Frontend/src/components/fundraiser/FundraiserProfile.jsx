@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Card } from "@/components/ui/card";
-import axios from '../config/axios';
+import axios from "@/config/axios";
 
 const FundraiserProfile = () => {
   const { user } = useSelector((state) => state.user);

@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { formatDistanceToNow } from 'date-fns';
-import axios from '../config/axios';
+import axios from '@/config/axios';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const FundraiserCauses = () => {

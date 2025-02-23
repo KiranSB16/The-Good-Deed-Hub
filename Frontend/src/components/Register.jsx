@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { registerUser } from "../slices/userSlice";
+import { registerUser } from "../slices/authSlice";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -38,15 +38,30 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Validate form data
       await validationSchema.validate(formData, { abortEarly: false });
-      dispatch(registerUser({ formData }));
-      navigate("/login");
-    } catch (error) {
-      const newErrors = {};
-      error.inner.forEach((err) => {
-        newErrors[err.path] = err.message;
-      });
-      setFormErrors(newErrors);
+      
+      // Dispatch register action with formData and navigate function
+      const resultAction = await dispatch(registerUser({ formData, navigate }));
+      
+      if (registerUser.fulfilled.match(resultAction)) {
+        // Registration successful - navigation is handled in the thunk
+        setFormErrors({});
+      } else {
+        // Handle registration error
+        const error = resultAction.payload;
+        setFormErrors({ submit: error.message || 'Registration failed' });
+      }
+    } catch (err) {
+      if (err instanceof Yup.ValidationError) {
+        const errors = {};
+        err.inner.forEach((error) => {
+          errors[error.path] = error.message;
+        });
+        setFormErrors(errors);
+      } else {
+        setFormErrors({ submit: err.message || 'Registration failed' });
+      }
     }
   };
 

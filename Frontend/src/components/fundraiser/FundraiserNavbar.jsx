@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { logout } from '../slices/userSlice';
+import { logout } from '@/slices/authSlice';
 import { Button } from "@/components/ui/button";
 
 const FundraiserNavbar = () => {

@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { createCause } from '../features/causeSlice';
+import {createCause} from '@/slices/causeSlice.jsx'
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { toast } from 'react-toastify';
-import axios from '../config/axios';
+import axios from '@/config/axios';
 
 const CreateCause = () => {
   const dispatch = useDispatch();
