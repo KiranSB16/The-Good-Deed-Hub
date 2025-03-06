@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchCauses } from '../features/causeSlice';
+import { fetchCauses } from '../slices/causeSlice';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { formatDistanceToNow } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Link } from 'react-router-dom';
 
 const CauseList = () => {
   const dispatch = useDispatch();
@@ -86,13 +87,9 @@ const CauseList = () => {
           <span>{formatDistanceToNow(new Date(cause.endDate), { addSuffix: true })}</span>
         </div>
 
-        <Button
-          onClick={() => window.location.href = `/causes/${cause._id}`}
-          className="w-full mt-4"
-          variant="outline"
-        >
+        <Link to={`/causes/${cause._id}`} className="text-primary hover:underline">
           View Details
-        </Button>
+        </Link>
       </div>
     </Card>
   );

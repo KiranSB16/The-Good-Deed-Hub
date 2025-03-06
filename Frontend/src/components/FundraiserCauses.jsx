@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { formatDistanceToNow } from 'date-fns';
 import axios from '../config/axios';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Pencil, Trash2 } from "lucide-react";
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 
 const FundraiserCauses = () => {
   const [causes, setCauses] = useState([]);
@@ -16,211 +20,185 @@ const FundraiserCauses = () => {
   useEffect(() => {
     const fetchCauses = async () => {
       try {
-        console.log("Current user:", user); // Debug log
-        if (!user || !user._id) { // Changed from user.id to user._id
+        if (!user?._id) {
           throw new Error('User ID not available');
         }
 
         setLoading(true);
-        const response = await axios.get('/api/causes');
-        console.log("API Response:", response.data);
+        setError(null);
+        const response = await axios.get('/causes');
+        
+        if (!response.data) {
+          throw new Error('No data received from server');
+        }
 
-        const userCauses = response.data.filter(cause => {
-          console.log("Comparing IDs:", {
-            causeFundraiserId: cause.fundraiserId._id,
-            userId: user._id
-          });
-          return cause.fundraiserId._id === user._id; // Changed from user.id to user._id
-        });
+        const userCauses = response.data.filter(cause => 
+          cause.fundraiserId?._id === user._id || cause.fundraiserId === user._id
+        );
 
-        console.log("Filtered causes:", userCauses);
         setCauses(userCauses);
       } catch (error) {
         console.error('Error fetching causes:', error);
-        setError(error.message || 'Failed to load causes');
+        setError(error.response?.data?.message || error.message || 'Failed to load causes');
       } finally {
         setLoading(false);
       }
     };
 
-    if (user?._id) { // Changed from user?.id to user?._id
+    if (user?._id) {
       fetchCauses();
     } else {
       setLoading(false);
     }
   }, [user]);
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'approved':
-        return 'bg-green-100 text-green-800';
-      case 'rejected':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-yellow-100 text-yellow-800';
-    }
-  };
-
-  const CauseCard = ({ cause }) => (
-    <Card className="overflow-hidden">
-      {cause.images && cause.images[0] && (
-        <div className="relative h-48">
-          <img
-            src={cause.images[0]}
-            alt={cause.title}
-            className="w-full h-full object-cover"
-          />
-          {cause.images.length > 1 && (
-            <span className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-sm">
-              +{cause.images.length - 1} more
-            </span>
-          )}
-        </div>
-      )}
-      <div className="p-4">
-        <div className="flex justify-between items-start mb-2">
-          <h2 className="text-xl font-semibold">{cause.title}</h2>
-          <span
-            className={`px-2 py-1 text-xs rounded-full capitalize ${getStatusColor(
-              cause.status
-            )}`}
-          >
-            {cause.status}
-          </span>
-        </div>
-
-        <p className="text-sm text-muted-foreground mb-4">
-          {cause.description.slice(0, 100)}...
-        </p>
-
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span>Progress</span>
-            <span>
-              {Math.round((cause.currentAmount / cause.goalAmount) * 100)}%
-            </span>
-          </div>
-          <Progress
-            value={(cause.currentAmount / cause.goalAmount) * 100}
-            className="h-2"
-          />
-          <div className="flex justify-between text-sm">
-            <span>₹{cause.currentAmount.toLocaleString()}</span>
-            <span>₹{cause.goalAmount.toLocaleString()}</span>
-          </div>
-        </div>
-
-        <div className="mt-4 text-sm text-muted-foreground">
-          <p>Created {formatDistanceToNow(new Date(cause.createdAt))} ago</p>
-          {cause.status === 'rejected' && (
-            <p className="mt-2 text-red-600">
-              Reason: {cause.rejectionMessage || 'No reason provided'}
-            </p>
-          )}
-          {cause.documents && cause.documents.length > 0 && (
-            <p className="mt-2">
-              <a
-                href={cause.documents[0]}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                View Supporting Document
-              </a>
-            </p>
-          )}
-        </div>
-      </div>
-    </Card>
-  );
-
   if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6">My Causes</h1>
-        <Card className="p-6">
-          <p className="text-center">Loading your causes...</p>
-        </Card>
-      </div>
-    );
+    return <div className="text-center p-4">Loading...</div>;
   }
 
   if (error) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6">My Causes</h1>
-        <Card className="p-6">
-          <p className="text-center text-red-600">{error}</p>
-        </Card>
-      </div>
-    );
+    return <div className="text-center text-red-500 p-4">{error}</div>;
   }
 
-  const approvedCauses = causes.filter(cause => cause.status === 'approved');
   const pendingCauses = causes.filter(cause => cause.status === 'pending approval');
+  const approvedCauses = causes.filter(cause => cause.status === 'approved');
   const rejectedCauses = causes.filter(cause => cause.status === 'rejected');
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">My Causes</h1>
+    <div className="container mx-auto p-4">
+      <Tabs defaultValue="all" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="all">All ({causes.length})</TabsTrigger>
+          <TabsTrigger value="pending">Pending ({pendingCauses.length})</TabsTrigger>
+          <TabsTrigger value="approved">Approved ({approvedCauses.length})</TabsTrigger>
+          <TabsTrigger value="rejected">Rejected ({rejectedCauses.length})</TabsTrigger>
+        </TabsList>
 
-      {causes.length === 0 ? (
-        <Card className="p-6">
-          <p className="text-center text-muted-foreground">
-            You haven't created any causes yet.
-          </p>
-        </Card>
-      ) : (
-        <Tabs defaultValue="all" className="w-full">
-          <TabsList className="mb-6">
-            <TabsTrigger value="all">
-              All ({causes.length})
-            </TabsTrigger>
-            <TabsTrigger value="approved">
-              Approved ({approvedCauses.length})
-            </TabsTrigger>
-            <TabsTrigger value="pending">
-              Pending ({pendingCauses.length})
-            </TabsTrigger>
-            <TabsTrigger value="rejected">
-              Rejected ({rejectedCauses.length})
-            </TabsTrigger>
-          </TabsList>
+        <TabsContent value="all" className="mt-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {causes.map(cause => (
+              <CauseCard key={cause._id} cause={cause} />
+            ))}
+          </div>
+        </TabsContent>
 
-          <TabsContent value="all">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {causes.map((cause) => (
-                <CauseCard key={cause._id} cause={cause} />
-              ))}
-            </div>
-          </TabsContent>
+        <TabsContent value="pending" className="mt-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {pendingCauses.map(cause => (
+              <CauseCard key={cause._id} cause={cause} />
+            ))}
+          </div>
+        </TabsContent>
 
-          <TabsContent value="approved">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {approvedCauses.map((cause) => (
-                <CauseCard key={cause._id} cause={cause} />
-              ))}
-            </div>
-          </TabsContent>
+        <TabsContent value="approved" className="mt-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {approvedCauses.map(cause => (
+              <CauseCard key={cause._id} cause={cause} />
+            ))}
+          </div>
+        </TabsContent>
 
-          <TabsContent value="pending">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {pendingCauses.map((cause) => (
-                <CauseCard key={cause._id} cause={cause} />
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="rejected">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {rejectedCauses.map((cause) => (
-                <CauseCard key={cause._id} cause={cause} />
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
-      )}
+        <TabsContent value="rejected" className="mt-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {rejectedCauses.map(cause => (
+              <CauseCard key={cause._id} cause={cause} />
+            ))}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
+  );
+};
+
+const CauseCard = ({ cause }) => {
+  const { user } = useSelector((state) => state.user);
+  const navigate = useNavigate();
+  
+  if (!cause) return null;
+
+  const causeFundraiserId = cause.fundraiserId?._id || cause.fundraiserId;
+  const isOwner = user?._id === causeFundraiserId;
+
+  console.log('Cause data:', {
+    currentAmount: cause.currentAmount,
+    goalAmount: cause.goalAmount,
+    targetAmount: cause.targetAmount
+  });
+
+  const handleEdit = () => {
+    navigate(`/fundraiser/causes/edit/${cause._id}`);
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete this cause?')) {
+      return;
+    }
+    try {
+      await axios.delete(`causes/${cause._id}`);
+      toast.success('Cause deleted successfully');
+      window.location.reload();
+    } catch (error) {
+      console.error('Error deleting cause:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete cause');
+    }
+  };
+
+  const progress = cause.goalAmount > 0 
+    ? (cause.currentAmount / cause.goalAmount) * 100 
+    : 0;
+
+  return (
+    <Card className="overflow-hidden group">
+      <div className="relative">
+        <img 
+          src={cause.images?.[0] || '/placeholder-image.jpg'} 
+          alt={cause.title} 
+          className="w-full h-48 object-cover"
+        />
+        {isOwner && (
+          <div className="absolute top-2 right-2 flex gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-white hover:bg-gray-100 text-gray-800"
+              onClick={handleEdit}
+            >
+              <Pencil className="h-4 w-4 mr-1" />
+              Edit
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="bg-red-500 hover:bg-red-600 text-white"
+              onClick={handleDelete}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
+            </Button>
+          </div>
+        )}
+      </div>
+      <CardHeader>
+        <CardTitle className="truncate">{cause.title}</CardTitle>
+        <CardDescription className="line-clamp-2">{cause.description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <div className="flex justify-between text-sm mb-1">
+            <span>Progress</span>
+            <span>{Math.round(progress)}%</span>
+          </div>
+          <Progress value={progress} className="h-2" />
+          <div className="flex justify-between mt-1 text-sm font-medium">
+            <span>Current: ₹{Number(cause.currentAmount || 0).toLocaleString()}</span>
+            <span>Goal: ₹{Number(cause.goalAmount || 0).toLocaleString()}</span>
+          </div>
+        </div>
+        <div className="text-sm text-muted-foreground">
+          Created {formatDistanceToNow(new Date(cause.createdAt || Date.now()), { addSuffix: true })}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

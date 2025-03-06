@@ -7,10 +7,10 @@ import authorizeUser from "../middlewares/authorization.js"
 import categorySchemaValidation from "../validators/category-validation-schema.js"
 const router = express.Router()
 
-router.post("/categories", AuthenticateUser , authorizeUser(['admin']),checkSchema(categorySchemaValidation) , categoryCltr.create)
-router.get("/categories", AuthenticateUser , categoryCltr.list )
-router.get("/categories/:id" , AuthenticateUser , categoryCltr.show)
-router.delete("/categories/:id" , AuthenticateUser , authorizeUser(['admin']),categoryCltr.delete)
+router.post("/", AuthenticateUser , authorizeUser(['admin']),checkSchema(categorySchemaValidation) , categoryCltr.create)
+router.get("/", AuthenticateUser , categoryCltr.list )
+router.get("/:id" , AuthenticateUser , categoryCltr.show)
+router.delete("/:id" , AuthenticateUser , authorizeUser(['admin']),categoryCltr.delete)
 
 
 export default router

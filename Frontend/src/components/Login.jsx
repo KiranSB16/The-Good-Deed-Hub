@@ -1,163 +1,166 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useDispatch, useSelector } from "react-redux";
-import { loginUser, clearError } from "../slices/userSlice";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
-import { toast } from "react-toastify";
-
-const validateEmail = (email) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-const validatePassword = (password) => {
-  // At least 1 lowercase, 1 uppercase, 1 number, 1 symbol
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
-  return passwordRegex.test(password);
-};
+import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import { loginUser, clearError } from '../slices/userSlice';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "react-hot-toast";
+import * as Yup from "yup";
 
 const Login = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [validationErrors, setValidationErrors] = useState({});
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState({});
   const dispatch = useDispatch();
   const navigate = useNavigate();
   
   const { loading, error, user } = useSelector((state) => state.user);
 
+  const validationSchema = Yup.object({
+    email: Yup.string()
+      .email("Please enter a valid email address")
+      .required("Email is required"),
+    password: Yup.string()
+      .required("Password is required")
+      .min(8, "Password must be at least 8 characters")
+  });
+
+  // Clear any existing errors when component mounts
   useEffect(() => {
     dispatch(clearError());
-  }, [dispatch]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Redirect if user is already logged in
   useEffect(() => {
-    if (error) {
-      if (Array.isArray(error)) {
-        // Handle validation errors from backend
-        const errorMessages = error.map(err => err.msg).join(', ');
-        toast.error(errorMessages);
-      } else {
-        toast.error(error);
-      }
+    const token = localStorage.getItem('token');
+    if (user && token) {
+      const redirectPath = getDefaultRoute(user.role);
+      navigate(redirectPath, { replace: true });
     }
-  }, [error]);
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (user) {
-      const role = user.role.toLowerCase();
-      console.log('Auth state updated - navigating to:', `/${role}`);
-      navigate(`/${role}`, { replace: true });
+  const getDefaultRoute = (role) => {
+    switch (role?.toLowerCase()) {
+      case 'admin':
+        return '/admin';
+      case 'fundraiser':
+        return '/fundraiser';
+      case 'donor':
+        return '/donor';
+      default:
+        return '/';
     }
-  }, [user, navigate]);
-
-  const validateForm = () => {
-    const errors = {};
-
-    if (!email) {
-      errors.email = 'Email is required';
-    } else if (!validateEmail(email)) {
-      errors.email = 'Please enter a valid email address';
-    }
-
-    if (!password) {
-      errors.password = 'Password is required';
-    } else if (!validatePassword(password)) {
-      errors.password = 'Password must contain at least 1 lowercase letter, 1 uppercase letter, 1 number, and 1 special character';
-    }
-
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!validateForm()) {
-        Object.values(validationErrors).forEach(error => {
-            toast.error(error);
-        });
-        return;
-    }
-
+    setErrors({});
+    
     try {
-        dispatch(clearError());
-        const result = await dispatch(loginUser({ 
-            formData: { email, password } // Wrap in formData object
-        })).unwrap();
-
-        if (result?.user) {
-            toast.success('Login successful!');
-        }
-        localStorage.setItem('token' , result.token)
+      await validationSchema.validate({ email, password }, { abortEarly: false });
+      await dispatch(loginUser({ email, password })).unwrap();
+      toast.success('Login successful!');
+      // Navigation will be handled by the useEffect above
     } catch (err) {
-        console.error("Login error:", err);
+      if (err.name === 'ValidationError') {
+        const validationErrors = {};
+        err.inner.forEach(error => {
+          validationErrors[error.path] = error.message;
+        });
+        setErrors(validationErrors);
+      } else if (err.response?.data?.errors) {
+        // Handle server-side validation errors
+        const serverErrors = {};
+        err.response.data.errors.forEach(error => {
+          serverErrors[error.path] = error.msg;
+        });
+        setErrors(serverErrors);
+      } else if (err.response?.data?.message) {
+        // Handle server-side error message
+        setErrors({ general: err.response.data.message });
+      } else if (err.message) {
+        // Handle other error messages
+        setErrors({ general: err.message });
+      } else {
+        setErrors({ general: 'An unexpected error occurred. Please try again.' });
+      }
     }
-}
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Login to The Good Deed Hub</CardTitle>
-          <CardDescription>
-            Enter your credentials to access your account
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
+      <Card className="w-full max-w-md bg-card shadow-2xl">
+        <CardHeader className="space-y-2 text-center">
+          <CardTitle className="text-3xl font-bold text-foreground">
+            Welcome Back
+          </CardTitle>
+          <CardDescription className="text-lg text-muted-foreground">
+            Sign in to continue your journey of making a difference
           </CardDescription>
         </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-lg text-foreground">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="Enter your email"
                 value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setValidationErrors(prev => ({ ...prev, email: '' }));
-                }}
+                onChange={(e) => setEmail(e.target.value)}
+                className={`h-12 text-lg bg-input border-2 ${errors.email ? 'border-red-500' : 'border-border'} focus:border-blue-500`}
+                placeholder="Enter your email"
                 required
-                disabled={loading}
-                autoComplete="email"
-                className={validationErrors.email ? 'border-red-500' : ''}
               />
-              {validationErrors.email && (
-                <p className="text-sm text-red-500">{validationErrors.email}</p>
+              {errors.email && (
+                <p className="text-red-500 text-sm mt-1">{errors.email}</p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-lg text-foreground">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter your password"
                 value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setValidationErrors(prev => ({ ...prev, password: '' }));
-                }}
+                onChange={(e) => setPassword(e.target.value)}
+                className={`h-12 text-lg bg-input border-2 ${errors.password ? 'border-red-500' : 'border-border'} focus:border-blue-500`}
+                placeholder="Enter your password"
                 required
-                disabled={loading}
-                autoComplete="current-password"
-                className={validationErrors.password ? 'border-red-500' : ''}
               />
-              {validationErrors.password && (
-                <p className="text-sm text-red-500">{validationErrors.password}</p>
+              {errors.password && (
+                <p className="text-red-500 text-sm mt-1">{errors.password}</p>
               )}
             </div>
-          </CardContent>
-          <CardFooter>
-            <Button 
-              type="submit" 
-              className="w-full" 
+            {errors.general && (
+              <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-md">
+                {errors.general}
+              </div>
+            )}
+            <Button
+              type="submit"
+              className="w-full h-12 text-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-200"
               disabled={loading}
             >
-              {loading ? 'Logging in...' : 'Login'}
+              {loading ? "Signing in..." : "Sign In"}
             </Button>
-          </CardFooter>
-        </form>
+          </form>
+        </CardContent>
+        <CardFooter className="text-center">
+          <p className="text-muted-foreground">
+            Don't have an account?{" "}
+            <button
+              onClick={() => navigate("/register")}
+              className="text-blue-600 hover:text-blue-700 font-semibold transition-colors duration-200"
+            >
+              Register here
+            </button>
+          </p>
+        </CardFooter>
       </Card>
     </div>
   );

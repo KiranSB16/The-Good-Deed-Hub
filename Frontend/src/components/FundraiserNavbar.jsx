@@ -1,7 +1,8 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { logout } from '../slices/userSlice';
+import { logout } from '@/slices/userSlice';
 import { Button } from "@/components/ui/button";
+import { Star } from 'lucide-react';
 
 const FundraiserNavbar = () => {
   const location = useLocation();
@@ -39,6 +40,12 @@ const FundraiserNavbar = () => {
               className={`px-4 py-2 rounded-md ${isActive('/fundraiser/causes')}`}
             >
               My Causes
+            </Link>
+            <Link
+              to="/fundraiser/reviews"
+              className={`px-4 py-2 rounded-md ${isActive('/fundraiser/reviews')}`}
+            >
+              Reviews
             </Link>
             <Link
               to="/create-cause"

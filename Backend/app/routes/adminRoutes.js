@@ -6,7 +6,15 @@ import { rejectCauseValidation } from "../validators/rejectCause-validation-sche
 import { checkSchema } from "express-validator"
 const router = express.Router()
 
-router.patch("/causes/approve/:id" , AuthenticateUser , authorizeUser(['admin']) , adminCltr.approveCause)
-router.patch("/causes/reject/:id" , AuthenticateUser , authorizeUser(['admin']) , checkSchema(rejectCauseValidation) ,adminCltr.rejectCause)
+// Category Management Routes
+router.get("/categories", AuthenticateUser, authorizeUser(['admin']), adminCltr.listCategories)
+router.post("/categories", AuthenticateUser, authorizeUser(['admin']), adminCltr.createCategory)
+router.delete("/categories/:id", AuthenticateUser, authorizeUser(['admin']), adminCltr.deleteCategory)
+
+// Cause Management Routes
+router.get("/causes", AuthenticateUser, authorizeUser(['admin']), adminCltr.listCauses)
+router.get("/test-causes", AuthenticateUser, authorizeUser(['admin']), adminCltr.testCauses)
+router.patch("/causes/approve/:id", AuthenticateUser, authorizeUser(['admin']), adminCltr.approveCause)
+router.patch("/causes/reject/:id", AuthenticateUser, authorizeUser(['admin']), checkSchema(rejectCauseValidation), adminCltr.rejectCause)
 
 export default router

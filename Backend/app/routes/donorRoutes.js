@@ -1,5 +1,5 @@
 import express from "express";
-import { AuthenticateUser } from "../middlewares/authentication.js";
+import { AuthenticateUser, authenticateDonor } from "../middlewares/authentication.js";
 import authorizeUser from "../middlewares/authorization.js";
 import donorCltr from "../controllers/donor-cltr.js";
 import { checkSchema } from "express-validator";
@@ -7,22 +7,24 @@ import { donorValidationSchema } from "../validators/donor-validation-schema.js"
 
 const router = express.Router();
 
-router.post(
-    "/donor/profile",
-    AuthenticateUser,
-    authorizeUser(["donor"]),
-    checkSchema(donorValidationSchema),
-    donorCltr.createProfile
-);
+// Apply donor authentication middleware to all routes
+router.use(authenticateDonor);
 
-router.put(
-    "/donor/profile",
-    AuthenticateUser,
-    authorizeUser(["donor"]),
-    checkSchema(donorValidationSchema),
-    donorCltr.updateProfile
-)
+// Profile routes
+router.get("/profile", donorCltr.getProfile);
+router.put("/profile", donorCltr.updateProfile);
 
-router.get("/donor/profile", AuthenticateUser, donorCltr.getProfile);
+// Stats route
+router.get('/stats', donorCltr.getStats);
+
+// Saved causes routes
+router.get('/saved-causes', donorCltr.getSavedCauses);
+router.post('/saved-causes', donorCltr.saveCause);
+router.delete('/saved-causes/:causeId', donorCltr.unsaveCause);
+
+// Donation routes
+router.get('/my-donations', donorCltr.getDonations);
+router.get('/donations/:causeId', donorCltr.getDonationsByCause);
+router.post('/donations/:causeId', donorCltr.createDonation);
 
 export default router;

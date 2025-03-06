@@ -48,7 +48,7 @@ const FileUpload = ({ onUploadSuccess, acceptedTypes = "image/jpeg, image/png, a
         });
 
         try {
-            const response = await axios.post('/api/upload', formData, {
+            const response = await axios.post('/upload', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                     'Authorization': `Bearer ${user.token}`

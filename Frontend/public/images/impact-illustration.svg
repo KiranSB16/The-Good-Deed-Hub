@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="600" height="400" viewBox="0 0 600 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Pattern -->
+  <path d="M0 0h600v400H0z" fill="#f8fafc"/>
+  
+  <!-- Abstract Shapes -->
+  <circle cx="300" cy="200" r="150" fill="#fecdd3" opacity="0.3"/>
+  <circle cx="350" cy="150" r="100" fill="#5eead4" opacity="0.3"/>
+  <circle cx="250" cy="250" r="80" fill="#c4b5fd" opacity="0.3"/>
+  
+  <!-- Heart Icon -->
+  <path d="M300 140c-8.75-20-30-30-50-30s-41.25 10-50 30c-17.5 40 50 80 50 80s67.5-40 50-80z" fill="#f43f5e"/>
+  
+  <!-- Hands -->
+  <path d="M250 280c-20-10-40 0-40 20s20 40 40 30 20-40 0-50z" fill="#14b8a6"/>
+  <path d="M350 280c20-10 40 0 40 20s-20 40-40 30-20-40 0-50z" fill="#14b8a6"/>
+  
+  <!-- Connection Lines -->
+  <path d="M150 150l100 100M350 150l100 100" stroke="#6b7280" stroke-width="2" stroke-dasharray="4"/>
+</svg>

@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { createCause } from '../features/causeSlice';
+import { createCause, uploadFiles } from '../slices/causeSlice';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { toast } from 'react-toastify';
+import { toast } from 'react-hot-toast';
 import axios from '../config/axios';
 
 const CreateCause = () => {
@@ -36,11 +36,39 @@ const CreateCause = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await axios.get('/api/categories');
-        setCategories(response.data);
+        setLoading(true);
+        const token = localStorage.getItem('token');
+        const response = await axios.get('/categories', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        console.log('Categories API Response:', response.data); // Debug log
+        
+        // Handle different response structures
+        if (response.data && typeof response.data === 'object') {
+          if (Array.isArray(response.data)) {
+            setCategories(response.data);
+          } else if (Array.isArray(response.data.categories)) {
+            setCategories(response.data.categories);
+          } else if (Array.isArray(response.data.data)) {
+            setCategories(response.data.data);
+          } else {
+            console.error('Unexpected categories data structure:', response.data);
+            toast.error('Invalid data format received from server');
+            setCategories([]);
+          }
+        } else {
+          console.error('Invalid response data:', response.data);
+          toast.error('Invalid response from server');
+          setCategories([]);
+        }
       } catch (error) {
         console.error('Error fetching categories:', error);
-        toast.error('Failed to load categories');
+        toast.error(error.response?.data?.message || 'Failed to load categories');
+        setCategories([]); // Ensure categories is always an array
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -49,9 +77,9 @@ const CreateCause = () => {
 
   // Redirect if not a fundraiser
   useEffect(() => {
-    if (!user || user.role !== 'fundraiser') {
-      navigate('/');
+    if (user && user.role !== 'fundraiser') {
       toast.error('Only fundraisers can create causes');
+      navigate('/');
     }
   }, [user, navigate]);
 
@@ -63,177 +91,100 @@ const CreateCause = () => {
     }));
   };
 
-  const handleFileChange = (e) => {
-    const { name, files } = e.target;
-    const fileArray = Array.from(files);
-  
-    if (name === 'images') {
-      if (fileArray.length + formData.images.length > 4) { 
-        toast.error('Maximum 4 images allowed');
-        e.target.value = '';
-        return;
-      }
-  
-      const validImages = fileArray.filter(file => {
-        const isValidType = file.type.match(/^image\/(jpeg|png|jpg)$/);
-        const isValidSize = file.size <= 5 * 1024 * 1024;
-  
-        if (!isValidType) {
-          toast.error(`${file.name} is not a valid image file (JPG/PNG only)`);
-        }
-        if (!isValidSize) {
-          toast.error(`${file.name} exceeds 5MB size limit`);
-        }
-  
-        return isValidType && isValidSize;
-      });
-  
-      if (validImages.length > 0) {
-        setFormData(prev => ({
-          ...prev,
-          images: [...prev.images, ...validImages]  // Append new images instead of replacing
-        }));
-  
-        // Create preview URLs for valid images
-        const imageUrls = validImages.map(file => URL.createObjectURL(file));
-        
-        setSelectedFiles(prev => ({
-          ...prev,
-          images: [...prev.images, ...imageUrls] // Append new preview images
-        }));
-      }
-    } else if (name === 'documents') {
-      const file = fileArray[0];
-      if (!file) return;
-  
-      if (file.type !== 'application/pdf') {
-        toast.error('Please upload a PDF file');
-        e.target.value = '';
-        return;
-      }
-  
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('PDF file size should not exceed 5MB');
-        e.target.value = '';
-        return;
-      }
-  
-      setFormData(prev => ({
-        ...prev,
-        documents: [...prev.documents, file] // Append the new document
-      }));
-  
-      setSelectedFiles(prev => ({
-        ...prev,
-        documents: [...prev.documents, file.name] // Append the document name
-      }));
-    }
-  };
-  
-
-  // Cleanup preview URLs when component unmounts
-  useEffect(() => {
-    return () => {
-      selectedFiles.images.forEach(url => URL.revokeObjectURL(url));
-    };
-  }, [selectedFiles.images]);
-
-  const validateForm = () => {
-    if (!formData.title.trim()) {
-      toast.error('Title is required');
-      return false;
-    }
-    if (!formData.description.trim()) {
-      toast.error('Description is required');
-      return false;
-    }
-    if (!formData.goalAmount || formData.goalAmount < 1000) {
-      toast.error('Goal amount must be at least ₹1000');
-      return false;
-    }
-    if (!formData.category) {
-      toast.error('Please select a category');
-      return false;
-    }
-    if (!formData.startDate || !formData.endDate) {
-      toast.error('Start and end dates are required');
-      return false;
-    }
-    if (new Date(formData.endDate) <= new Date(formData.startDate)) {
-      toast.error('End date must be after start date');
-      return false;
-    }
-    if (formData.images.length === 0) {
-      toast.error('At least one image is required');
-      return false;
-    }
-    return true;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const {title, description, goalAmount, category, startDate, endDate, images, documents} = formData
-    console.log("inside the submit", {title})
-  
-    if (!title || !description || !goalAmount || !category) {
-      console.log("require the ")
-      alert("Please fill all required fields.");
-      return;
-    }
-  
-    const causeData = {
-      title,
-      description,
-      goalAmount,
-      category,
-      startDate,
-      endDate,
-      images,
-      documents
-    };
-
-    console.log("before dispatch")
-  
-   dispatch(createCause(causeData))
-      .unwrap()
-      .then((data) => {
-        alert("Cause created successfully!");
-        console.log("Success:", data);
-      })
-      .catch((error) => {
-        alert("Error: " + error.message);
-        console.error("Error creating cause:", error);
-      });
-  };
-  
-  
-  
-
-  const removeFile = (type, index) => {
+  const handleFileChange = async (e, type) => {
+    const files = Array.from(e.target.files);
+    
+    // Preview files
+    const previews = files.map(file => ({
+      name: file.name,
+      url: URL.createObjectURL(file)
+    }));
+    
+    setSelectedFiles(prev => ({
+      ...prev,
+      [type]: [...prev[type], ...previews]
+    }));
+    
+    // Store files for upload
     setFormData(prev => ({
       ...prev,
-      [type]: prev[type].filter((_, i) => i !== index)
+      [type]: [...prev[type], ...files]
     }));
+  };
+
+  const removeFile = (type, index) => {
+    // Revoke object URL to prevent memory leaks
+    if (selectedFiles[type][index]?.url) {
+      URL.revokeObjectURL(selectedFiles[type][index].url);
+    }
 
     setSelectedFiles(prev => ({
       ...prev,
       [type]: prev[type].filter((_, i) => i !== index)
     }));
+    
+    setFormData(prev => ({
+      ...prev,
+      [type]: prev[type].filter((_, i) => i !== index)
+    }));
+  };
 
-    if (type === 'images') {
-      URL.revokeObjectURL(selectedFiles.images[index]);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      setLoading(true);
+      
+      // Validate form data
+      if (!formData.title || !formData.description || !formData.goalAmount || !formData.category) {
+        throw new Error('Please fill in all required fields');
+      }
+      
+      // Create FormData for file upload
+      const form = new FormData();
+      
+      // Append text fields
+      form.append('title', formData.title);
+      form.append('description', formData.description);
+      form.append('goalAmount', formData.goalAmount);
+      form.append('category', formData.category);
+      form.append('startDate', formData.startDate);
+      form.append('endDate', formData.endDate);
+      
+      // Append files
+      formData.images.forEach(file => {
+        form.append('images', file);
+      });
+      
+      formData.documents.forEach(file => {
+        form.append('documents', file);
+      });
+      
+      // Create cause
+      const result = await dispatch(createCause(form)).unwrap();
+      
+      toast.success('Cause created successfully!');
+      navigate('/fundraiser/causes');
+    } catch (error) {
+      console.error('Error creating cause:', error);
+      toast.error(error.message || 'Failed to create cause');
+    } finally {
+      setLoading(false);
     }
   };
 
+  if (!user) {
+    return <div className="text-center p-4">Loading...</div>;
+  }
+
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto p-4">
       <Card className="max-w-2xl mx-auto p-6">
-        <h1 className="text-3xl font-bold mb-6">Create New Cause</h1>
+        <h1 className="text-2xl font-bold mb-6">Create a New Cause</h1>
         
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium mb-2">Title</label>
+            <label className="block mb-2">Title</label>
             <Input
               type="text"
               name="title"
@@ -243,149 +194,133 @@ const CreateCause = () => {
               required
             />
           </div>
-
+          
           <div>
-            <label className="block text-sm font-medium mb-2">Description</label>
+            <label className="block mb-2">Description</label>
             <Textarea
               name="description"
               value={formData.description}
               onChange={handleInputChange}
               placeholder="Describe your cause"
               required
-              rows={4}
             />
           </div>
-
+          
           <div>
-            <label className="block text-sm font-medium mb-2">Goal Amount (₹)</label>
+            <label className="block mb-2">Goal Amount (₹)</label>
             <Input
               type="number"
               name="goalAmount"
               value={formData.goalAmount}
               onChange={handleInputChange}
-              placeholder="Minimum ₹1,000"
+              placeholder="Enter target amount"
+              min="1"
               required
-              min="1000"
             />
           </div>
-
+          
           <div>
-            <label className="block text-sm font-medium mb-2">Category</label>
+            <label className="block mb-2">Category</label>
             <select
               name="category"
               value={formData.category}
               onChange={handleInputChange}
+              className="w-full p-2 border rounded"
               required
-              className="w-full p-2 border rounded-md"
+              disabled={loading || !categories.length}
             >
-              <option value="">Select a category</option>
-              {categories.map((category) => (
+              <option value="">
+                {loading ? 'Loading categories...' : categories.length === 0 ? 'No categories available' : 'Select a category'}
+              </option>
+              {Array.isArray(categories) && categories.map(category => (
                 <option key={category._id} value={category._id}>
                   {category.name}
                 </option>
               ))}
             </select>
+            {!loading && categories.length === 0 && (
+              <p className="text-sm text-red-500 mt-1">Failed to load categories. Please try again later.</p>
+            )}
           </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Start Date</label>
-              <Input
-                type="date"
-                name="startDate"
-                value={formData.startDate}
-                onChange={handleInputChange}
-                required
-                min={new Date().toISOString().split('T')[0]}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">End Date</label>
-              <Input
-                type="date"
-                name="endDate"
-                value={formData.endDate}
-                onChange={handleInputChange}
-                required
-                min={formData.startDate || new Date().toISOString().split('T')[0]}
-              />
-            </div>
-          </div>
-
+          
           <div>
-            <label className="block text-sm font-medium mb-2">Images (Max 4)</label>
-
+            <label className="block mb-2">Start Date</label>
+            <Input
+              type="date"
+              name="startDate"
+              value={formData.startDate}
+              onChange={handleInputChange}
+              min={new Date().toISOString().split('T')[0]}
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="block mb-2">End Date</label>
+            <Input
+              type="date"
+              name="endDate"
+              value={formData.endDate}
+              onChange={handleInputChange}
+              min={formData.startDate || new Date().toISOString().split('T')[0]}
+              required
+            />
+          </div>
+          
+          <div>
+            <label className="block mb-2">Images</label>
             <Input
               type="file"
-              name="images"
-              onChange={handleFileChange}
-              accept="image/jpeg,image/png"
-              disabled = {selectedFiles.images.length > 3}
+              accept="image/*"
               multiple
-              className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+              onChange={(e) => handleFileChange(e, 'images')}
+              className="mb-2"
             />
-            <p className="text-sm text-muted-foreground mt-1">
-              Upload up to 4 images (JPEG/PNG, max 5MB each)
-            </p>
-            
-            {/* Image previews */}
-            {selectedFiles.images.length > 0 && (
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                {selectedFiles.images.map((url, index) => (
-                  <div key={index} className="relative">
-                    <img
-                      src={url}
-                      alt={`Preview ${index + 1}`}
-                      className="w-full h-40 object-cover rounded-lg"
-                    />
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      className="absolute top-2 right-2"
-                      onClick={() => removeFile('images', index)}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="grid grid-cols-4 gap-2">
+              {selectedFiles.images.map((file, index) => (
+                <div key={index} className="relative">
+                  <img
+                    src={file.url}
+                    alt={file.name}
+                    className="w-full h-24 object-cover rounded"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeFile('images', index)}
+                    className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded-full"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
-
+          
           <div>
-            <label className="block text-sm font-medium mb-2">Supporting Document (Optional)</label>
+            <label className="block mb-2">Documents</label>
             <Input
               type="file"
-              name="documents"
-              onChange={handleFileChange}
-              accept=".pdf"
-              className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+              accept=".pdf,.doc,.docx"
+              multiple
+              onChange={(e) => handleFileChange(e, 'documents')}
+              className="mb-2"
             />
-            <p className="text-sm text-muted-foreground mt-1">
-              Upload a PDF document (max 5MB)
-            </p>
-            
-            {/* Document list */}
-            {selectedFiles.documents.length > 0 && (
-              <div className="mt-4">
-                {selectedFiles.documents.map((name, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-lg">
-                    <span className="text-sm">{name}</span>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => removeFile('documents', index)}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="space-y-2">
+              {selectedFiles.documents.map((file, index) => (
+                <div key={index} className="flex items-center justify-between p-2 border rounded">
+                  <span className="truncate">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeFile('documents', index)}
+                    className="text-red-500"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
-
+          
           <Button
             type="submit"
             className="w-full"

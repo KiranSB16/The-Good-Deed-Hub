@@ -5,9 +5,12 @@ import userCltr from "../controllers/user-cltr.js"
 import {AuthenticateUser} from "../middlewares/authentication.js"
 const router = express.Router()
 
-router.post("/users/register" , checkSchema(userRegisterSchema), userCltr.register)
-router.post("/users/login", checkSchema(userLoginSchema) , userCltr.login)
-router.get("/users/profile" , AuthenticateUser , userCltr.profile )
-router.get("/users" , AuthenticateUser , userCltr.all)
+router.post("/register" , checkSchema(userRegisterSchema), userCltr.register)
+router.post("/login", checkSchema(userLoginSchema) , userCltr.login)
+router.get("/profile" , AuthenticateUser , userCltr.profile )
+router.get("/" , AuthenticateUser , userCltr.all)
+
+// Add route for toggling user access
+router.patch("/:id/access", AuthenticateUser, userCltr.toggleUserAccess)
 
 export default router

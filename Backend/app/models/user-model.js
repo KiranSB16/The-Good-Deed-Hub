@@ -4,6 +4,7 @@ const userSchema = new Schema({
   email: String,
   password: String,
   role: { type: String, enum: ['donor', 'fundraiser', 'admin']},
+  isRestricted: { type: Boolean, default: false },
   otp: String , 
   otpExpiry: Date,
 } , {timestamps : true});

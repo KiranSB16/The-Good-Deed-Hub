@@ -1,64 +1,65 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate, Routes, Route } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { formatDistanceToNow } from 'date-fns';
 import FundraiserNavbar from './FundraiserNavbar';
 import FundraiserProfile from './FundraiserProfile';
 import FundraiserCauses from './FundraiserCauses';
+import axios from '../config/axios';
+import EditCause from './EditCause';
+import FundraiserDashboard from './FundraiserDashboard';
 
-const FundraiserDashboard = () => {
-  const { user } = useSelector((state) => state.user);
-  const navigate = useNavigate();
+// Remove the FundraiserDashboard component definition
+// const FundraiserDashboard = () => {
+//   ...existing code...
+// };
+
+const CauseCard = ({ cause }) => {
+  if (!cause) return null;
+
+  const progress = cause.targetAmount > 0 
+    ? (cause.currentAmount / cause.targetAmount) * 100 
+    : 0;
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Welcome, {user?.name}!</h1>
-      
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-          <div className="space-y-4">
-            <Button
-              onClick={() => navigate('/create-cause')}
-              className="w-full"
-            >
-              Create New Cause
-            </Button>
-            <Button
-              onClick={() => navigate('/fundraiser/causes')}
-              variant="outline"
-              className="w-full"
-            >
-              View My Causes
-            </Button>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Account Overview</h2>
-          <div className="space-y-2">
-            <p>
-              <span className="font-medium">Name:</span> {user?.name}
-            </p>
-            <p>
-              <span className="font-medium">Email:</span> {user?.email}
-            </p>
-            <p>
-              <span className="font-medium">Role:</span>{' '}
-              <span className="capitalize">{user?.role}</span>
-            </p>
-          </div>
-        </Card>
+    <Card className="overflow-hidden">
+      <div className="relative">
+        <img 
+          src={cause.images?.[0] || '/placeholder-image.jpg'} 
+          alt={cause.title} 
+          className="w-full h-48 object-cover"
+        />
       </div>
-    </div>
+      <div className="p-4 space-y-4">
+        <div>
+          <h3 className="font-semibold truncate">{cause.title}</h3>
+          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{cause.description}</p>
+        </div>
+        <div>
+          <div className="flex justify-between text-sm mb-1">
+            <span>Progress</span>
+            <span>{Math.round(progress)}%</span>
+          </div>
+          <Progress value={progress} className="h-2" />
+          <div className="flex justify-between mt-1 text-sm">
+            <span>₹{(cause.currentAmount || 0).toLocaleString()}</span>
+            <span>₹{(cause.targetAmount || 0).toLocaleString()}</span>
+          </div>
+        </div>
+        <div className="text-sm text-muted-foreground">
+          Created {formatDistanceToNow(new Date(cause.createdAt || Date.now()), { addSuffix: true })}
+        </div>
+      </div>
+    </Card>
   );
 };
 
 const Fundraiser = () => {
-  const navigate = useNavigate();
   const { user } = useSelector((state) => state.user);
-  console.log({user})
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!user || user.role !== 'fundraiser') {
@@ -69,12 +70,13 @@ const Fundraiser = () => {
   if (!user) return null;
 
   return (
-    <div>
+    <div className="min-h-screen bg-background">
       <FundraiserNavbar />
       <Routes>
-        <Route path="/" element={<FundraiserDashboard />} />
-        <Route path="/profile" element={<FundraiserProfile />} />
-        <Route path="/causes" element={<FundraiserCauses />} />
+        <Route index element={<FundraiserDashboard />} />
+        <Route path="profile" element={<FundraiserProfile />} />
+        <Route path="causes" element={<FundraiserCauses />} />
+        <Route path="causes/edit/:id" element={<EditCause />} />
       </Routes>
     </div>
   );

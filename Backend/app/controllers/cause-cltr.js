@@ -54,38 +54,31 @@ causeCltr.create = async (req, res) => {
 
 causeCltr.list = async (req, res) => {
   try {
-    // Fetch causes and populate fundraiser details
-    const causes = await Cause.find().populate("fundraiserId", "name email");
+    const { status } = req.query;
+    const query = status ? { status } : {};
 
-    // // Format the response with serial numbers
-    // const response = causes.map((cause) => ({
-    //   id: cause._id,
-    //   title: cause.title,
-    //   description: cause.description,
-    //   goalAmount: cause.goalAmount,
-    //   currentAmount: cause.currentAmount,
-    //   category: cause.category,
-    //   fundraiserId: cause.fundraiserId?._id || null, // Include fundraiser ID
-    //   fundraiserName: cause.fundraiserId?.name || "Unknown", // Include fundraiser name
-    //   fundraiserEmail: cause.fundraiserId?.email || "Unknown", // Include fundraiser email
-    //   status: cause.status,
-    //   startDate: cause.startDate,
-    //   endDate: cause.endDate,
-    //   createdAt: cause.createdAt,
-    //   updatedAt: cause.updatedAt,
-    // }));
+    // Fetch causes with the status filter and populate fundraiser details
+    const causes = await Cause.find(query)
+      .populate("fundraiserId", "name email")
+      .populate("category", "name");
 
     res.status(200).json(causes);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch causes", error: error.message });
+    console.error("Error fetching causes:", error);
+    res.status(500).json({ 
+      message: "Failed to fetch causes", 
+      error: error.message 
+    });
   }
 };
 
 causeCltr.show = async (req, res) => {
   try {
     const id = req.params.id;
-    // Find the cause by ID and populate fundraiser details
-    const cause = await Cause.findById(id).populate("fundraiserId", "name email");
+    // Find the cause by ID and populate both fundraiser and category details
+    const cause = await Cause.findById(id)
+      .populate("fundraiserId", "name email")
+      .populate("category", "name");
     if (!cause) {
       return res.status(404).json({ message: "Cause not found" });
     }
