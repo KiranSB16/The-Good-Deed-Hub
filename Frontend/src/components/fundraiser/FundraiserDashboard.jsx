@@ -5,7 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import axios from '../config/axios';
+import axios from '../../config/axios';
 import { Pencil, Trash2 } from "lucide-react";
 import { toast } from 'react-hot-toast';
 
