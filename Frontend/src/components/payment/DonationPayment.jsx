@@ -52,7 +52,7 @@ const PaymentForm = ({ amount, causeId, cause, onSuccess }) => {
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: `${window.location.origin}/donor/dashboard`,
+          return_url: `${window.location.origin}/payment-success?causeId=${causeId}&amount=${amount}`,
           payment_method_data: {
             billing_details: {
               name: cause?.title || 'Donation',
@@ -68,20 +68,38 @@ const PaymentForm = ({ amount, causeId, cause, onSuccess }) => {
 
       // Payment successful
       if (paymentIntent && paymentIntent.status === 'succeeded') {
-        await axios.post('/api/payments/payment-success', {
-          paymentIntentId: paymentIntent.id,
-          causeId,
-          amount,
-          message,
-        });
+        try {
+          // Update payment status in backend
+          await axios.post('/api/payments/payment-success', {
+            paymentIntentId: paymentIntent.id,
+            causeId,
+            amount,
+            message,
+          });
 
-        toast.success('Thank you for your generous donation! Your support makes a difference.');
-        onSuccess();
-        navigate('/donor/dashboard');
+          // Update cause amount
+          await axios.post(`/api/causes/${causeId}/donate`, {
+            amount: parseFloat(amount),
+            transactionId: paymentIntent.id
+          });
+
+          onSuccess();
+          navigate('/payment-success', {
+            state: {
+              causeId,
+              amount,
+              transactionId: paymentIntent.id
+            }
+          });
+        } catch (error) {
+          console.error('Error updating payment status:', error);
+          toast.error('Payment successful but failed to update status. Please contact support.');
+        }
       }
     } catch (error) {
       console.error('Payment error:', error);
       toast.error('Payment failed. Please try again.');
+      navigate('/payment-failed');
     } finally {
       setIsProcessing(false);
     }

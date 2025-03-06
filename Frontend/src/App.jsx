@@ -26,7 +26,7 @@ import FundraiserProfile from './components/FundraiserProfile';
 import FundraiserCauses from './components/FundraiserCauses';
 import EditCause from './components/EditCause';
 import { useSelector, useDispatch } from 'react-redux';
-import PaymentSuccess from "@/pages/PaymentSuccess";
+import PaymentSuccess from './components/PaymentSuccess';
 import PaymentFailed from "@/pages/PaymentFailed";
 
 // Protected Route component with role check
@@ -41,8 +41,10 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   return children;
 };
 
+// Main App component
 const App = () => {
   const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.user);
 
   useEffect(() => {
     // Check if there's a stored user and token

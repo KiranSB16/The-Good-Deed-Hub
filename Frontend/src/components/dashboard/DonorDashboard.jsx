@@ -317,34 +317,29 @@ export default function DonorDashboard() {
                       {cause.description}
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="flex-1">
+                  <CardContent className="flex-grow">
                     <div className="space-y-4">
-                      <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>Progress</span>
-                        <span>{Math.round((cause.raisedAmount / cause.targetAmount) * 100)}%</span>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Progress</span>
+                          <span className="font-medium">
+                            {Math.round((cause.currentAmount / cause.targetAmount) * 100)}%
+                          </span>
+                        </div>
+                        <Progress value={(cause.currentAmount / cause.targetAmount) * 100} />
+                        <div className="flex justify-between text-sm">
+                          <span className="font-medium">Raised: ₹{cause.currentAmount?.toLocaleString()}</span>
+                          <span className="text-muted-foreground">Goal: ₹{cause.targetAmount?.toLocaleString()}</span>
+                        </div>
                       </div>
-                      <Progress 
-                        value={(cause.raisedAmount / cause.targetAmount) * 100} 
-                        className="h-2"
-                      />
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Raised</span>
-                        <span className="font-medium">₹{cause.raisedAmount.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Goal</span>
-                        <span className="font-medium">₹{cause.targetAmount.toLocaleString()}</span>
-                      </div>
+                      <Button 
+                        className="w-full"
+                        onClick={() => navigate(`/causes/${cause._id}`)}
+                      >
+                        Donate Now
+                      </Button>
                     </div>
                   </CardContent>
-                  <CardFooter className="pt-4">
-                    <Button 
-                      className="w-full" 
-                      onClick={() => navigate(`/causes/${cause._id}`)}
-                    >
-                      Donate Now
-                    </Button>
-                  </CardFooter>
                 </Card>
               ))}
             </div>
