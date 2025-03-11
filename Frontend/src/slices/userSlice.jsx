@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from '../config/axios';
+import axios from '@/lib/axios';
 
 // Helper function to set token in localStorage and axios headers
 const setAuthToken = (token) => {
@@ -42,11 +42,12 @@ export const loginUser = createAsyncThunk(
       return user;
     } catch (error) {
       console.error('Login error:', error.response?.data || error.message);
+      // Return the error message from the server, or a default message if none exists
       return rejectWithValue(
         error.response?.data?.message || 
-        error.response?.data?.error || 
+        error.response?.data?.errors?.[0]?.msg || 
         error.message || 
-        'Login failed'
+        'Invalid email or password'
       );
     }
   }

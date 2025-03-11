@@ -8,7 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 import FundraiserNavbar from './FundraiserNavbar';
 import FundraiserProfile from './FundraiserProfile';
 import FundraiserCauses from './FundraiserCauses';
-import axios from '../config/axios';
+import axios from '@/lib/axios';
 import EditCause from './EditCause';
 import FundraiserDashboard from './FundraiserDashboard';
 

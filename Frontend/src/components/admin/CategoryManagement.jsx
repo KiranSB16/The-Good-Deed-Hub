@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { toast } from 'react-hot-toast';
-import axios from '../../config/axios';
+import axios from '@/lib/axios';
 
 export default function CategoryManagement() {
   const [categories, setCategories] = useState([]);

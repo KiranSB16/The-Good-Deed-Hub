@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { toast } from 'react-toastify';
-import axios from '../config/axios';
+import axios from '@/lib/axios';
 import { useSelector } from 'react-redux';
 
 const FileUpload = ({ onUploadSuccess, acceptedTypes = "image/jpeg, image/png, application/pdf" }) => {

@@ -7,7 +7,7 @@ export const fetchPendingCauses = createAsyncThunk(
   'cause/fetchPendingCauses',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get('/causes?status=pending approval');
+      const response = await axios.get('/causes?status=pending');
       return response.data;
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to fetch pending causes');

@@ -7,7 +7,7 @@ const router = express.Router();
 
 // Create a new donation
 router.post(
-    '/donations',
+    '/',
     AuthenticateUser,
     authorizeUser(['donor']),
     donationCltr.create
@@ -15,7 +15,7 @@ router.post(
 
 // Get donor's donations
 router.get(
-    '/donations/my-donations',
+    '/my-donations',
     AuthenticateUser,
     authorizeUser(['donor']),
     donationCltr.getMyDonations
@@ -23,7 +23,7 @@ router.get(
 
 // Get recommended causes
 router.get(
-    '/causes/recommended',
+    '/recommended',
     AuthenticateUser,
     authorizeUser(['donor']),
     donationCltr.getRecommendedCauses

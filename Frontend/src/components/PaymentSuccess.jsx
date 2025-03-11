@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2 } from "lucide-react";
-import axios from '../config/axios';
+import axios from '@/lib/axios';
 import { toast } from 'react-hot-toast';
 import { useSelector } from 'react-redux';
 

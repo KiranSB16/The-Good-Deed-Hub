@@ -3,7 +3,7 @@ dotenv.config()
 import nodemailer, { createTransport } from "nodemailer"
 const transporter = nodemailer.createTransport({
     service : 'gmail',
-    host : 'smtp.gmail',
+    host : 'smtp.gmail.com',
     port : 587,
     secure : false,
     auth : {
@@ -12,7 +12,7 @@ const transporter = nodemailer.createTransport({
     }
 })
 
-export const notifyCauseApproval = async (fundraiser, cause) => {
+export const notifyCauseApproval = async (fundraiser, cause, recipientEmail) => {
     const subject = "Cause Approved!";
     const html = `
       <p>Dear ${fundraiser.name},</p>
@@ -20,16 +20,15 @@ export const notifyCauseApproval = async (fundraiser, cause) => {
       <p>Thank you for your contribution to the community.</p>
       <p>Best Regards,<br>The Good Deed Hub Team</p>
     `
-    // Explicitly include the recipient (to) and sender (from)
     await sendEmail({
-      to: process.env.USER,
+      to: recipientEmail,
       from: `"The Good Deed Hub" <${process.env.USER}>`,
       subject,
       html,
     });
   };
 
-  export const notifyCauseRejection = async (fundraiser, cause) => {
+  export const notifyCauseRejection = async (fundraiser, cause, recipientEmail) => {
     const subject = "Cause Rejected";
     const html = `
       <p>Dear ${fundraiser.name},</p>
@@ -39,9 +38,8 @@ export const notifyCauseApproval = async (fundraiser, cause) => {
       <p>Best Regards,<br>The Good Deed Hub Team</p>
     `;
   
-    // Explicitly include the recipient (to) and sender (from)
     await sendEmail({
-      to: process.env.USER ,
+      to: recipientEmail,
       from: `"The Good Deed Hub" <${process.env.USER}>`,
       subject,
       html,
@@ -49,7 +47,7 @@ export const notifyCauseApproval = async (fundraiser, cause) => {
   };
 
 // Send OTP for password reset
-export const sendPasswordResetOTP = async (to, otp) => {
+export const sendPasswordResetOTP = async (recipientEmail, otp) => {
   const subject = "Password Reset OTP";
   const html = `
     <p>Your OTP for password reset is: <strong>${otp}</strong></p>
@@ -57,9 +55,9 @@ export const sendPasswordResetOTP = async (to, otp) => {
     <p>If you did not request this, please ignore this email.</p>
     <p>Best Regards,<br>The Good Deed Hub Team</p>
   `
-  await transporter.sendMail({
+  await sendEmail({
     from: `"The Good Deed Hub" <${process.env.USER}>`,
-    to : process.env.USER,
+    to: recipientEmail,
     subject,
     html,
   });

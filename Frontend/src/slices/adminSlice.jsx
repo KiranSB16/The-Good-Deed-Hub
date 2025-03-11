@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from '../config/axios';
+import axios from '@/lib/axios';
 import { toast } from 'react-hot-toast';
 
 // Remove feedback-related thunks and keep other thunks

@@ -2,6 +2,8 @@ import User from "../models/user-model.js";
 import {validationResult} from "express-validator"
 import bcryptjs from "bcryptjs"
 import jwt from "jsonwebtoken"
+import cloudinary from "../utils/cloudinary.js"
+import fs from "fs"
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-here';
 const userCltr = {}
@@ -68,8 +70,15 @@ userCltr.login = async(req, res) => {
         if(!user){
             console.log('User not found:', email); // Debug log
             return res.status(400).json({
-                errors: [{ msg: 'Invalid email or password' }]
+                message: 'Invalid email or password'
             })
+        }
+
+        // Check if user is restricted
+        if (user.isRestricted) {
+            return res.status(403).json({
+                message: 'Your account has been restricted. Please contact the administrator.'
+            });
         }
 
         console.log('User found:', { email: user.email, role: user.role }); // Debug log
@@ -78,7 +87,7 @@ userCltr.login = async(req, res) => {
         if(!isVerified){
             console.log('Password verification failed'); // Debug log
             return res.status(400).json({
-                errors: [{ msg: 'Invalid email or password' }]
+                message: 'Invalid email or password'
             })
         }
 
@@ -100,7 +109,7 @@ userCltr.login = async(req, res) => {
     } catch(err){
         console.error('Login error:', err)
         res.status(500).json({
-            errors: [{ msg: 'Server error during login' }]
+            message: 'Server error during login'
         })
     }
 }
@@ -172,5 +181,64 @@ userCltr.toggleUserAccess = async(req, res) => {
         })
     }
 }
+
+userCltr.updateProfile = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Handle profile image upload
+        if (req.file) {
+            try {
+                // Upload to cloudinary
+                const result = await cloudinary.uploader.upload(req.file.path, {
+                    folder: 'profile_images',
+                    width: 300,
+                    crop: 'scale'
+                });
+
+                // Delete the temporary file
+                fs.unlinkSync(req.file.path);
+
+                // Update user's profile image
+                user.profileImage = result.secure_url;
+            } catch (uploadError) {
+                console.error('Error uploading image:', uploadError);
+                // If there's a temporary file, delete it
+                if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+                    fs.unlinkSync(req.file.path);
+                }
+                return res.status(500).json({ message: 'Error uploading profile image' });
+            }
+        }
+
+        // Update other fields if provided
+        const fields = ['name', 'phone', 'address', 'bio'];
+        fields.forEach(field => {
+            if (req.body[field] !== undefined) {
+                user[field] = req.body[field];
+            }
+        });
+
+        await user.save();
+
+        // Return updated user data without password
+        const userData = user.toObject();
+        delete userData.password;
+        delete userData.resetPasswordOTP;
+        delete userData.resetPasswordExpires;
+
+        res.json(userData);
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        // If there's a temporary file, delete it
+        if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        res.status(500).json({ message: 'Server error while updating profile' });
+    }
+};
 
 export default userCltr

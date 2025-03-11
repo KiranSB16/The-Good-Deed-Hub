@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Camera, Loader2, Phone, Mail, Calendar, Target } from 'lucide-react';
-import axios from '../config/axios';
+import axios from '@/lib/axios';
 import { toast } from 'react-hot-toast';
 
 const FundraiserProfile = () => {

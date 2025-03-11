@@ -23,4 +23,8 @@ router.get('/:id' , AuthenticateUser, causeCltr.show)
 router.put('/:id' , AuthenticateUser, authorizeUser(['fundraiser', 'admin']), causeCltr.update)
 router.delete('/:id' , AuthenticateUser, authorizeUser(['fundraiser', 'admin']), causeCltr.delete)
 
+// Add approval and rejection routes
+router.put('/:id/approve', AuthenticateUser, authorizeUser(['admin']), causeCltr.approve)
+router.put('/:id/reject', AuthenticateUser, authorizeUser(['admin']), causeCltr.reject)
+
 export default router

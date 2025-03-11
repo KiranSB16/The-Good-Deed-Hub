@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { toast } from 'react-hot-toast';
-import axios from '../../config/axios';
+import axios from '@/lib/axios';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -32,7 +32,7 @@ export default function AdminDashboard() {
 
       // Fetch causes with different statuses
       const [pendingCauses, approvedCauses, completedCauses] = await Promise.all([
-        axios.get('/causes?status=pending approval'),
+        axios.get('/causes?status=pending'),
         axios.get('/causes?status=approved'),
         axios.get('/causes?status=completed')
       ]);
@@ -201,7 +201,7 @@ export default function AdminDashboard() {
               Active Causes
             </h2>
             <Button
-              onClick={() => navigate('/admin/causes')}
+              onClick={() => navigate('/admin/causes?status=approved')}
               className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
               variant="ghost"
             >

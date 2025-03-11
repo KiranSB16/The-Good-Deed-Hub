@@ -8,7 +8,7 @@ import { Label } from "../components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
 import * as Yup from "yup";
 import { toast } from 'react-hot-toast';
-import axios from '../config/axios';
+import axios from '@/lib/axios';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -22,19 +22,23 @@ const Register = () => {
   const navigate = useNavigate();
 
   const validationSchema = Yup.object({
-    name: Yup.string().required("Name is Required"),
-    email: Yup.string().email("Invalid format").required("Email is Required"),
+    name: Yup.string()
+      .min(3, "Name must be at least 3 characters")
+      .max(50, "Name must not exceed 50 characters")
+      .required("Name is required"),
+    email: Yup.string()
+      .email("Please enter a valid email address")
+      .required("Email is required"),
     password: Yup.string()
-      .min(8, "Password must be minimum 8 characters long")
-      .matches(
-        /[!@#$%^&*(),.?":{}|<>]/,
-        "Password must contain at least one symbol"
-      )
+      .min(8, "Password must be at least 8 characters")
+      .matches(/[!@#$%^&*(),.?":{}|<>]/, "Password must contain at least one symbol")
       .matches(/[0-9]/, "Password must contain at least one number")
       .matches(/[A-Z]/, "Password must contain at least one uppercase letter")
       .matches(/[a-z]/, "Password must contain at least one lowercase letter")
-      .required("Password is Required"),
-    role: Yup.string().required("Role is Required"),
+      .required("Password is required"),
+    role: Yup.string()
+      .oneOf(["donor", "fundraiser"], "Role must be either donor or fundraiser")
+      .required("Role is required"),
   });
 
   const handleSubmit = async (e) => {
@@ -144,34 +148,19 @@ const Register = () => {
 
             <div className="space-y-2">
               <Label htmlFor="role" className="text-lg text-foreground">
-                I want to
+                Role
               </Label>
-              <div className="grid grid-cols-2 gap-4">
-                <Button
-                  type="button"
-                  variant={formData.role === "donor" ? "default" : "outline"}
-                  className={`h-12 text-lg transition-colors duration-200 ${
-                    formData.role === "donor"
-                      ? "bg-blue-600 hover:bg-blue-700 text-white"
-                      : "border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
-                  }`}
-                  onClick={() => handleChange({ target: { name: "role", value: "donor" } })}
-                >
-                  Donate
-                </Button>
-                <Button
-                  type="button"
-                  variant={formData.role === "fundraiser" ? "default" : "outline"}
-                  className={`h-12 text-lg transition-colors duration-200 ${
-                    formData.role === "fundraiser"
-                      ? "bg-blue-600 hover:bg-blue-700 text-white"
-                      : "border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
-                  }`}
-                  onClick={() => handleChange({ target: { name: "role", value: "fundraiser" } })}
-                >
-                  Fundraise
-                </Button>
-              </div>
+              <select
+                id="role"
+                name="role"
+                value={formData.role}
+                onChange={handleChange}
+                className={`h-12 text-lg bg-input border-2 w-full rounded-md px-3 ${formErrors.role ? 'border-red-500' : 'border-border'} focus:border-blue-500`}
+              >
+                <option value="">Select your role</option>
+                <option value="donor">Donor</option>
+                <option value="fundraiser">Fundraiser</option>
+              </select>
               {formErrors.role && (
                 <p className="text-red-500 text-sm mt-1">{formErrors.role}</p>
               )}
@@ -185,7 +174,7 @@ const Register = () => {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex flex-col space-y-4 text-center">
+        <CardFooter className="text-center">
           <p className="text-muted-foreground">
             Already have an account?{" "}
             <button
@@ -195,12 +184,6 @@ const Register = () => {
               Sign in here
             </button>
           </p>
-          <button
-            onClick={() => navigate("/")}
-            className="text-gray-600 hover:text-gray-800 font-semibold transition-colors duration-200"
-          >
-            Back to Home
-          </button>
         </CardFooter>
       </Card>
     </div>

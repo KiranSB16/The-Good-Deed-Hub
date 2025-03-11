@@ -5,7 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import axios from '../config/axios';
+import axios from '@/lib/axios';
 import { Pencil, Trash2 } from "lucide-react";
 import { toast } from 'react-hot-toast';
 
@@ -100,7 +100,7 @@ const FundraiserDashboard = () => {
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {approvedCauses.map((cause) => (
-              <CauseCard key={cause._id} cause={cause} onEdit={handleEdit} onDelete={handleDelete} />
+              <CauseCard key={cause._id} cause={cause} />
             ))}
           </div>
         )}
@@ -109,11 +109,40 @@ const FundraiserDashboard = () => {
   );
 };
 
-const CauseCard = ({ cause, onEdit, onDelete }) => {
+const CauseCard = ({ cause }) => {
+  const { user } = useSelector((state) => state.user);
+  const navigate = useNavigate();
+  
   if (!cause) return null;
 
-  const progress = cause.targetAmount > 0 
-    ? (cause.currentAmount / cause.targetAmount) * 100 
+  const causeFundraiserId = cause.fundraiserId?._id || cause.fundraiserId;
+  const isOwner = user?._id === causeFundraiserId;
+
+  console.log('Cause data:', {
+    currentAmount: cause.currentAmount,
+    goalAmount: cause.goalAmount
+  });
+
+  const handleEdit = () => {
+    navigate(`/fundraiser/causes/edit/${cause._id}`);
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete this cause?')) {
+      return;
+    }
+    try {
+      await axios.delete(`causes/${cause._id}`);
+      toast.success('Cause deleted successfully');
+      window.location.reload();
+    } catch (error) {
+      console.error('Error deleting cause:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete cause');
+    }
+  };
+
+  const progress = cause.goalAmount > 0 
+    ? (cause.currentAmount / cause.goalAmount) * 100 
     : 0;
 
   return (
@@ -134,7 +163,7 @@ const CauseCard = ({ cause, onEdit, onDelete }) => {
             variant="outline"
             size="sm"
             className="bg-white hover:bg-gray-100 text-gray-800"
-            onClick={() => onEdit(cause._id)}
+            onClick={handleEdit}
           >
             <Pencil className="h-4 w-4 mr-1" />
             Edit
@@ -143,7 +172,7 @@ const CauseCard = ({ cause, onEdit, onDelete }) => {
             variant="destructive"
             size="sm"
             className="bg-red-500 hover:bg-red-600 text-white"
-            onClick={() => onDelete(cause._id)}
+            onClick={handleDelete}
           >
             <Trash2 className="h-4 w-4 mr-1" />
             Delete
@@ -163,7 +192,7 @@ const CauseCard = ({ cause, onEdit, onDelete }) => {
           <Progress value={progress} className="h-2" />
           <div className="flex justify-between mt-1 text-sm font-medium">
             <span>Current: ₹{Number(cause.currentAmount || 0).toLocaleString()}</span>
-            <span>Goal: ₹{Number(cause.targetAmount || 0).toLocaleString()}</span>
+            <span>Goal: ₹{Number(cause.goalAmount || 0).toLocaleString()}</span>
           </div>
         </div>
         <div className="text-sm text-muted-foreground">

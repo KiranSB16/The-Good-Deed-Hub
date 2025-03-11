@@ -14,7 +14,8 @@ import {
   TrendingUp,
   Users,
   Calendar,
-  ChevronDown
+  ChevronDown,
+  X
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +43,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { fetchCauses } from '@/slices/causeSlice';
+import { fetchCauses, setFilters, clearFilters } from '@/slices/causeSlice';
 import { logout } from '@/slices/userSlice';
 import { Pagination } from '@/components/ui/pagination';
 import { toast } from 'react-hot-toast';
@@ -69,74 +70,72 @@ const categories = [
   { id: 'others', name: 'Others' },
 ];
 
+const sortOptions = [
+  { value: 'latest', label: 'Latest First' },
+  { value: 'oldest', label: 'Oldest First' },
+  { value: 'target-high', label: 'Highest Target' },
+  { value: 'target-low', label: 'Lowest Target' },
+  { value: 'progress-high', label: 'Most Progress' },
+  { value: 'progress-low', label: 'Least Progress' },
+  { value: 'urgency-high', label: 'Most Urgent' },
+  { value: 'urgency-low', label: 'Least Urgent' },
+];
+
 export default function DonorDashboard() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
   
   const { user } = useSelector((state) => state.user);
-  const { causes, loading } = useSelector((state) => state.causes);
+  const { 
+    causes, 
+    loading, 
+    pagination, 
+    filters 
+  } = useSelector((state) => state.causes);
   
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [sortBy, setSortBy] = useState('latest');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [filteredCauses, setFilteredCauses] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
 
+  // Effect to fetch causes with current filters and pagination
   useEffect(() => {
-    const loadCauses = async () => {
+    const fetchData = async () => {
       try {
-        await dispatch(fetchCauses()).unwrap();
+        await dispatch(fetchCauses({
+          page: pagination.currentPage,
+          ...filters
+        })).unwrap();
       } catch (error) {
         toast.error('Failed to load causes');
       }
     };
 
-    loadCauses();
-  }, [dispatch]);
+    fetchData();
+  }, [dispatch, pagination.currentPage, filters]);
 
-  useEffect(() => {
-    if (causes) {
-      let filtered = [...causes].filter(cause => cause.status === 'approved');
+  // Handler for filter changes
+  const handleFilterChange = (key, value) => {
+    dispatch(setFilters({ [key]: value }));
+    // Reset to first page when filters change
+    dispatch(fetchCauses({ 
+      page: 1,
+      ...filters,
+      [key]: value
+    }));
+  };
 
-      // Apply search filter
-      if (searchTerm) {
-        filtered = filtered.filter(cause =>
-          cause.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          cause.description.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-      }
+  // Handler for clearing all filters
+  const handleClearFilters = () => {
+    dispatch(clearFilters());
+    dispatch(fetchCauses({ page: 1 }));
+  };
 
-      // Apply category filter
-      if (selectedCategory) {
-        filtered = filtered.filter(cause => cause.category === selectedCategory);
-      }
-
-      // Apply sorting
-      filtered.sort((a, b) => {
-        switch (sortBy) {
-          case 'latest':
-            return new Date(b.createdAt) - new Date(a.createdAt);
-          case 'oldest':
-            return new Date(a.createdAt) - new Date(b.createdAt);
-          case 'target-high':
-            return b.targetAmount - a.targetAmount;
-          case 'target-low':
-            return a.targetAmount - b.targetAmount;
-          case 'progress-high':
-            return (b.raisedAmount / b.targetAmount) - (a.raisedAmount / a.targetAmount);
-          case 'progress-low':
-            return (a.raisedAmount / a.targetAmount) - (b.raisedAmount / b.targetAmount);
-          default:
-            return 0;
-        }
-      });
-
-      setFilteredCauses(filtered);
-      // Reset to first page when filters change
-      setCurrentPage(1);
-    }
-  }, [causes, searchTerm, selectedCategory, sortBy]);
+  // Handler for page changes
+  const handlePageChange = (newPage) => {
+    dispatch(fetchCauses({
+      page: newPage,
+      ...filters
+    }));
+  };
 
   const handleLogout = () => {
     dispatch(logout());
@@ -150,11 +149,6 @@ export default function DonorDashboard() {
       </div>
     );
   }
-
-  const paginatedCauses = filteredCauses.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -265,44 +259,117 @@ export default function DonorDashboard() {
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input
-                    placeholder="Search causes..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search by title, description, category or organization..."
+                    value={filters.search}
+                    onChange={(e) => handleFilterChange('search', e.target.value)}
                     className="pl-10"
                   />
                 </div>
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger className="w-full md:w-[200px]">
-                    <SelectValue placeholder="All Categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">All Categories</SelectItem>
-                    {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-full md:w-[200px]">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="latest">Latest First</SelectItem>
-                    <SelectItem value="oldest">Oldest First</SelectItem>
-                    <SelectItem value="target-high">Target Amount (High to Low)</SelectItem>
-                    <SelectItem value="target-low">Target Amount (Low to High)</SelectItem>
-                    <SelectItem value="progress-high">Progress (High to Low)</SelectItem>
-                    <SelectItem value="progress-low">Progress (Low to High)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="md:w-auto"
+                >
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filters
+                  {Object.values(filters).some(Boolean) && (
+                    <Badge variant="secondary" className="ml-2">
+                      {Object.values(filters).filter(Boolean).length}
+                    </Badge>
+                  )}
+                </Button>
               </div>
+
+              {showFilters && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
+                  <Select 
+                    value={filters.category} 
+                    onValueChange={(value) => handleFilterChange('category', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All Categories</SelectItem>
+                      {categories.map((category) => (
+                        <SelectItem key={category.id} value={category.id}>
+                          {category.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select 
+                    value={filters.sortBy} 
+                    onValueChange={(value) => handleFilterChange('sortBy', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sortOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Min Amount"
+                      value={filters.minAmount}
+                      onChange={(e) => handleFilterChange('minAmount', e.target.value)}
+                      className="w-1/2"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Max Amount"
+                      value={filters.maxAmount}
+                      onChange={(e) => handleFilterChange('maxAmount', e.target.value)}
+                      className="w-1/2"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Active filters and clear button */}
+              {Object.values(filters).some(Boolean) && (
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(filters).map(([key, value]) => {
+                      if (!value) return null;
+                      return (
+                        <Badge key={key} variant="secondary" className="flex items-center gap-1">
+                          {key}: {value}
+                          <X
+                            className="h-3 w-3 cursor-pointer"
+                            onClick={() => handleFilterChange(key, '')}
+                          />
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearFilters}
+                  >
+                    Clear all
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Results count */}
+            <div className="mb-4 text-sm text-muted-foreground">
+              Showing {causes.length} of {pagination.totalCauses} causes
             </div>
 
             {/* Causes Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {paginatedCauses.map((cause) => (
+              {causes.map((cause) => (
                 <Card key={cause._id} className="flex flex-col hover:shadow-lg transition-shadow">
                   <CardHeader>
                     <div className="flex justify-between items-start">
@@ -345,34 +412,30 @@ export default function DonorDashboard() {
             </div>
 
             {/* Pagination */}
-            {filteredCauses.length > ITEMS_PER_PAGE && (
+            {pagination.totalPages > 1 && (
               <div className="mt-8 flex justify-center">
                 <Pagination
-                  currentPage={currentPage}
-                  totalPages={Math.ceil(filteredCauses.length / ITEMS_PER_PAGE)}
-                  onPageChange={setCurrentPage}
+                  currentPage={pagination.currentPage}
+                  totalPages={pagination.totalPages}
+                  onPageChange={handlePageChange}
                 />
               </div>
             )}
 
             {/* Empty State */}
-            {filteredCauses.length === 0 && (
+            {causes.length === 0 && (
               <div className="text-center py-12">
                 <div className="text-muted-foreground mb-4">
-                  {searchTerm || selectedCategory ? (
+                  {Object.values(filters).some(Boolean) ? (
                     <>No causes found matching your filters.</>
                   ) : (
                     <>No causes available at the moment.</>
                   )}
                 </div>
-                {(searchTerm || selectedCategory) && (
+                {Object.values(filters).some(Boolean) && (
                   <Button
                     variant="outline"
-                    onClick={() => {
-                      setSearchTerm('');
-                      setSelectedCategory('');
-                      setSortBy('latest');
-                    }}
+                    onClick={handleClearFilters}
                   >
                     Clear Filters
                   </Button>

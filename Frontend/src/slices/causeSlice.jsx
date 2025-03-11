@@ -1,27 +1,8 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from '../config/axios';
+import axios from '@/lib/axios';
 import { toast } from 'react-hot-toast';
 
 // Async thunks
-export const uploadFiles = createAsyncThunk(
-  'causes/uploadFiles',
-  async (formData, { rejectWithValue }) => {
-    try {
-      const response = await axios.post('/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      toast.success('Files uploaded successfully');
-      return response.data;
-    } catch (error) {
-      const message = error.response?.data?.message || 'Failed to upload files';
-      toast.error(message);
-      return rejectWithValue(message);
-    }
-  }
-);
-
 export const fetchCauses = createAsyncThunk(
   'causes/fetchAll',
   async (_, { rejectWithValue }) => {
@@ -38,9 +19,9 @@ export const fetchCauses = createAsyncThunk(
 
 export const fetchCauseById = createAsyncThunk(
   'causes/fetchById',
-  async (id, { rejectWithValue }) => {
+  async (causeId, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`/causes/${id}`);
+      const response = await axios.get(`/causes/${causeId}`);
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || 'Failed to fetch cause';
@@ -52,16 +33,17 @@ export const fetchCauseById = createAsyncThunk(
 
 export const createCause = createAsyncThunk(
   'causes/create',
-  async (formData, { rejectWithValue }) => {
+  async (causeData, { rejectWithValue }) => {
     try {
-      const response = await axios.post('/causes', formData, {
+      const response = await axios.post('/causes', causeData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
       toast.success('Cause created successfully');
-      return response.data;
+      return response.data.cause;
     } catch (error) {
+      console.error('Error creating cause:', error.response?.data || error.message);
       const message = error.response?.data?.message || 'Failed to create cause';
       toast.error(message);
       return rejectWithValue(message);
@@ -71,13 +53,9 @@ export const createCause = createAsyncThunk(
 
 export const updateCause = createAsyncThunk(
   'causes/update',
-  async ({ id, formData }, { rejectWithValue }) => {
+  async ({ causeId, causeData }, { rejectWithValue }) => {
     try {
-      const response = await axios.put(`/causes/${id}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await axios.put(`/causes/${causeId}`, causeData);
       toast.success('Cause updated successfully');
       return response.data;
     } catch (error) {
@@ -90,57 +68,13 @@ export const updateCause = createAsyncThunk(
 
 export const deleteCause = createAsyncThunk(
   'causes/delete',
-  async (id, { rejectWithValue }) => {
+  async (causeId, { rejectWithValue }) => {
     try {
-      await axios.delete(`/causes/${id}`);
+      await axios.delete(`/causes/${causeId}`);
       toast.success('Cause deleted successfully');
-      return id;
+      return causeId;
     } catch (error) {
       const message = error.response?.data?.message || 'Failed to delete cause';
-      toast.error(message);
-      return rejectWithValue(message);
-    }
-  }
-);
-
-export const fetchPendingCauses = createAsyncThunk(
-  'causes/fetchPending',
-  async (_, { rejectWithValue }) => {
-    try {
-      console.log('CauseSlice - Fetching pending causes from:', '/causes?status=pending approval');
-      const response = await axios.get('/causes?status=pending approval');
-      console.log('CauseSlice - Pending causes response:', {
-        status: response.status,
-        data: response.data,
-        headers: response.headers
-      });
-      
-      if (!response.data) {
-        console.error('CauseSlice - No data received from server');
-        throw new Error('No data received from server');
-      }
-      
-      console.log('CauseSlice - Successfully fetched pending causes:', {
-        count: response.data?.length || 0,
-        causes: response.data
-      });
-      
-      return response.data || [];
-    } catch (error) {
-      console.error('CauseSlice - Error fetching pending causes:', {
-        message: error.message,
-        response: {
-          data: error.response?.data,
-          status: error.response?.status,
-          headers: error.response?.headers
-        },
-        config: {
-          url: error.config?.url,
-          method: error.config?.method,
-          headers: error.config?.headers
-        }
-      });
-      const message = error.response?.data?.message || 'Failed to fetch pending causes';
       toast.error(message);
       return rejectWithValue(message);
     }
@@ -151,7 +85,7 @@ export const approveCause = createAsyncThunk(
   'causes/approve',
   async (causeId, { rejectWithValue }) => {
     try {
-      const response = await axios.patch(`/admin/causes/approve/${causeId}`);
+      const response = await axios.put(`/causes/${causeId}/approve`);
       toast.success('Cause approved successfully');
       return response.data;
     } catch (error) {
@@ -164,11 +98,9 @@ export const approveCause = createAsyncThunk(
 
 export const rejectCause = createAsyncThunk(
   'causes/reject',
-  async ({ causeId, rejectionMessage }, { rejectWithValue }) => {
+  async ({ causeId, reason }, { rejectWithValue }) => {
     try {
-      const response = await axios.patch(`/admin/causes/reject/${causeId}`, {
-        rejectionMessage
-      });
+      const response = await axios.put(`/causes/${causeId}/reject`, { reason });
       toast.success('Cause rejected successfully');
       return response.data;
     } catch (error) {
@@ -181,10 +113,9 @@ export const rejectCause = createAsyncThunk(
 
 const initialState = {
   causes: [],
-  currentCause: null,
   selectedCause: null,
   loading: false,
-  error: null,
+  error: null
 };
 
 const causeSlice = createSlice({
@@ -194,19 +125,13 @@ const causeSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
-    clearCurrentCause: (state) => {
-      state.currentCause = null;
-    },
-    setSelectedCause: (state, action) => {
-      state.selectedCause = action.payload;
-    },
     clearSelectedCause: (state) => {
       state.selectedCause = null;
-    },
+    }
   },
   extraReducers: (builder) => {
     builder
-      // Fetch All Causes
+      // Fetch all causes
       .addCase(fetchCauses.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -219,52 +144,56 @@ const causeSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // Fetch Single Cause
+
+      // Fetch cause by ID
       .addCase(fetchCauseById.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchCauseById.fulfilled, (state, action) => {
         state.loading = false;
-        state.currentCause = action.payload;
+        state.selectedCause = action.payload;
       })
       .addCase(fetchCauseById.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      // Create Cause
+
+      // Create cause
       .addCase(createCause.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(createCause.fulfilled, (state, action) => {
         state.loading = false;
-        state.causes.push(action.payload.cause);
+        state.causes.push(action.payload);
       })
       .addCase(createCause.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      // Update Cause
+
+      // Update cause
       .addCase(updateCause.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(updateCause.fulfilled, (state, action) => {
         state.loading = false;
-        const index = state.causes.findIndex(cause => cause._id === action.payload.cause._id);
+        const index = state.causes.findIndex(cause => cause._id === action.payload._id);
         if (index !== -1) {
-          state.causes[index] = action.payload.cause;
+          state.causes[index] = action.payload;
         }
-        if (state.currentCause?._id === action.payload.cause._id) {
-          state.currentCause = action.payload.cause;
+        if (state.selectedCause?._id === action.payload._id) {
+          state.selectedCause = action.payload;
         }
       })
       .addCase(updateCause.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      // Delete Cause
+
+      // Delete cause
       .addCase(deleteCause.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -272,57 +201,51 @@ const causeSlice = createSlice({
       .addCase(deleteCause.fulfilled, (state, action) => {
         state.loading = false;
         state.causes = state.causes.filter(cause => cause._id !== action.payload);
-        if (state.currentCause?._id === action.payload) {
-          state.currentCause = null;
+        if (state.selectedCause?._id === action.payload) {
+          state.selectedCause = null;
         }
       })
       .addCase(deleteCause.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      // Fetch Pending Causes
-      .addCase(fetchPendingCauses.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchPendingCauses.fulfilled, (state, action) => {
-        state.loading = false;
-        state.causes = action.payload;
-      })
-      .addCase(fetchPendingCauses.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
-      // Approve Cause
+
+      // Approve cause
       .addCase(approveCause.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(approveCause.fulfilled, (state, action) => {
         state.loading = false;
-        state.causes = state.causes.filter(cause => cause._id !== action.payload.cause._id);
-        state.selectedCause = null;
+        const index = state.causes.findIndex(cause => cause._id === action.payload.cause._id);
+        if (index !== -1) {
+          state.causes[index] = action.payload.cause;
+        }
       })
       .addCase(approveCause.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      // Reject Cause
+
+      // Reject cause
       .addCase(rejectCause.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(rejectCause.fulfilled, (state, action) => {
         state.loading = false;
-        state.causes = state.causes.filter(cause => cause._id !== action.payload.cause._id);
-        state.selectedCause = null;
+        const index = state.causes.findIndex(cause => cause._id === action.payload.cause._id);
+        if (index !== -1) {
+          state.causes[index] = action.payload.cause;
+        }
       })
       .addCase(rejectCause.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });
-  },
+  }
 });
 
-export const { clearError, clearCurrentCause, setSelectedCause, clearSelectedCause } = causeSlice.actions;
+export const { clearError, clearSelectedCause } = causeSlice.actions;
+
 export default causeSlice.reducer; 

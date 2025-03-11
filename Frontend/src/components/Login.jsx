@@ -25,6 +25,10 @@ const Login = () => {
     password: Yup.string()
       .required("Password is required")
       .min(8, "Password must be at least 8 characters")
+      .matches(/[!@#$%^&*(),.?":{}|<>]/, "Password must contain at least one symbol")
+      .matches(/[0-9]/, "Password must contain at least one number")
+      .matches(/[A-Z]/, "Password must contain at least one uppercase letter")
+      .matches(/[a-z]/, "Password must contain at least one lowercase letter")
   });
 
   // Clear any existing errors when component mounts
@@ -64,27 +68,26 @@ const Login = () => {
       toast.success('Login successful!');
       // Navigation will be handled by the useEffect above
     } catch (err) {
+      console.error('Login error:', err);
       if (err.name === 'ValidationError') {
         const validationErrors = {};
         err.inner.forEach(error => {
           validationErrors[error.path] = error.message;
         });
         setErrors(validationErrors);
-      } else if (err.response?.data?.errors) {
-        // Handle server-side validation errors
-        const serverErrors = {};
-        err.response.data.errors.forEach(error => {
-          serverErrors[error.path] = error.msg;
-        });
-        setErrors(serverErrors);
       } else if (err.response?.data?.message) {
         // Handle server-side error message
-        setErrors({ general: err.response.data.message });
+        const errorMessage = err.response.data.message;
+        setErrors({ general: errorMessage });
+        toast.error(errorMessage);
       } else if (err.message) {
         // Handle other error messages
         setErrors({ general: err.message });
+        toast.error(err.message);
       } else {
-        setErrors({ general: 'An unexpected error occurred. Please try again.' });
+        const defaultError = 'An unexpected error occurred. Please try again.';
+        setErrors({ general: defaultError });
+        toast.error(defaultError);
       }
     }
   };
@@ -101,7 +104,7 @@ const Login = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" noValidate>
             <div className="space-y-2">
               <Label htmlFor="email" className="text-lg text-foreground">
                 Email
@@ -113,7 +116,7 @@ const Login = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 className={`h-12 text-lg bg-input border-2 ${errors.email ? 'border-red-500' : 'border-border'} focus:border-blue-500`}
                 placeholder="Enter your email"
-                required
+                required={false}
               />
               {errors.email && (
                 <p className="text-red-500 text-sm mt-1">{errors.email}</p>
@@ -130,7 +133,7 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 className={`h-12 text-lg bg-input border-2 ${errors.password ? 'border-red-500' : 'border-border'} focus:border-blue-500`}
                 placeholder="Enter your password"
-                required
+                required={false}
               />
               {errors.password && (
                 <p className="text-red-500 text-sm mt-1">{errors.password}</p>
@@ -158,6 +161,15 @@ const Login = () => {
               className="text-blue-600 hover:text-blue-700 font-semibold transition-colors duration-200"
             >
               Register here
+            </button>
+          </p>
+          <p className="text-muted-foreground mt-2">
+            Forgot your password?{" "}
+            <button
+              onClick={() => navigate("/forgot-password")}
+              className="text-blue-600 hover:text-blue-700 font-semibold transition-colors duration-200"
+            >
+              Reset it here
             </button>
           </p>
         </CardFooter>

@@ -1,30 +1,29 @@
 import express from "express";
-import { AuthenticateUser, authenticateDonor } from "../middlewares/authentication.js";
+import { AuthenticateUser } from "../middlewares/authentication.js";
 import authorizeUser from "../middlewares/authorization.js";
 import donorCltr from "../controllers/donor-cltr.js";
 import { checkSchema } from "express-validator";
 import { donorValidationSchema } from "../validators/donor-validation-schema.js";
+import upload from "../middlewares/multer.js";
 
 const router = express.Router();
 
-// Apply donor authentication middleware to all routes
-router.use(authenticateDonor);
-
 // Profile routes
-router.get("/profile", donorCltr.getProfile);
-router.put("/profile", donorCltr.updateProfile);
+router.get("/profile", AuthenticateUser, authorizeUser(['donor']), donorCltr.getProfile);
+router.post("/profile", AuthenticateUser, donorCltr.createProfile);
+router.put("/profile", AuthenticateUser, upload.single('profileImage'), donorCltr.updateProfile);
 
 // Stats route
-router.get('/stats', donorCltr.getStats);
+router.get('/stats', AuthenticateUser, authorizeUser(['donor']), donorCltr.getStats);
 
 // Saved causes routes
-router.get('/saved-causes', donorCltr.getSavedCauses);
-router.post('/saved-causes', donorCltr.saveCause);
-router.delete('/saved-causes/:causeId', donorCltr.unsaveCause);
+router.get('/saved-causes', AuthenticateUser, authorizeUser(['donor']), donorCltr.getSavedCauses);
+router.post('/save-cause', AuthenticateUser, authorizeUser(['donor']), donorCltr.saveCause);
+router.delete('/saved-causes/:causeId', AuthenticateUser, authorizeUser(['donor']), donorCltr.unsaveCause);
 
 // Donation routes
-router.get('/my-donations', donorCltr.getDonations);
-router.get('/donations/:causeId', donorCltr.getDonationsByCause);
-router.post('/donations/:causeId', donorCltr.createDonation);
+router.get('/donations', AuthenticateUser, authorizeUser(['donor']), donorCltr.getDonations);
+router.get('/donations/:causeId', AuthenticateUser, authorizeUser(['donor']), donorCltr.getDonationsByCause);
+router.post('/donations/:causeId', AuthenticateUser, authorizeUser(['donor']), donorCltr.createDonation);
 
 export default router;

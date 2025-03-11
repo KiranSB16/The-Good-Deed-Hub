@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { useSelector, useDispatch } from 'react-redux';
-import axios from '../config/axios';
+import axios from '@/lib/axios';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import DonorProfile from './DonorProfile';

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import axios from '../../config/axios';
+import axios from '@/lib/axios';
 import { Button } from '@/components/ui/button';
 
 export default function UserManagement() {

@@ -7,17 +7,26 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'react-hot-toast';
-import axios from '@/config/axios';
+import axios from '@/lib/axios';
 import { updateUser } from '@/slices/userSlice';
 
 const DonorProfile = () => {
   const { user } = useSelector((state) => state.user);
   const dispatch = useDispatch();
   const [loading, setLoading] = useState(false);
+
+  // Format initial phone number to remove country code and spaces
+  const formatInitialPhone = (phone) => {
+    if (!phone) return '';
+    // Remove all non-digits and take the last 10 digits
+    const digits = phone.replace(/\D/g, '');
+    return digits.slice(-10);
+  };
+
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
-    phone: user?.phone || '',
+    phone: formatInitialPhone(user?.mobileNumber) || '',
     address: user?.address || '',
     bio: user?.bio || '',
     profileImage: user?.profileImage || ''
@@ -25,10 +34,21 @@ const DonorProfile = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // Handle phone number formatting
+    if (name === 'phone') {
+      // Remove all non-digit characters and take only the last 10 digits
+      const digits = value.replace(/\D/g, '').slice(-10);
+      setFormData(prev => ({
+        ...prev,
+        [name]: digits
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   const handleImageChange = async (e) => {
@@ -36,37 +56,79 @@ const DonorProfile = () => {
     if (!file) return;
 
     try {
-      const formData = new FormData();
-      formData.append('image', file);
+      const formDataObj = new FormData();
+      formDataObj.append('profileImage', file);
+      formDataObj.append('formData', JSON.stringify({
+        name: formData.name,
+        mobileNumber: formData.phone, // Already formatted as 10 digits
+        address: formData.address,
+        bio: formData.bio
+      }));
 
-      const response = await axios.post('/upload', formData, {
+      const response = await axios.put('/donor/profile', formDataObj, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       });
 
+      // Update both form data and Redux store
       setFormData(prev => ({
         ...prev,
-        profileImage: response.data.url
+        profileImage: response.data.profileImage,
+        name: response.data.name,
+        phone: formatInitialPhone(response.data.mobileNumber),
+        address: response.data.address,
+        bio: response.data.bio
       }));
 
-      toast.success('Profile image updated successfully');
+      // Update the user state in Redux
+      dispatch(updateUser(response.data));
+
+      toast.success('Profile updated successfully');
     } catch (error) {
-      toast.error('Failed to upload image');
+      toast.error(error.response?.data?.message || 'Failed to upload image');
       console.error('Error uploading image:', error);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate phone number
+    if (formData.phone && formData.phone.length !== 10) {
+      toast.error('Phone number must be exactly 10 digits');
+      return;
+    }
+    
     setLoading(true);
 
     try {
-      const response = await axios.put('/users/profile', formData);
+      const formDataObj = new FormData();
+      formDataObj.append('formData', JSON.stringify({
+        name: formData.name,
+        mobileNumber: formData.phone, // Already formatted as 10 digits
+        address: formData.address,
+        bio: formData.bio
+      }));
+
+      const response = await axios.put('/donor/profile', formDataObj);
+      
+      // Update both form data and Redux store
+      setFormData(prev => ({
+        ...prev,
+        name: response.data.name,
+        phone: formatInitialPhone(response.data.mobileNumber),
+        address: response.data.address,
+        bio: response.data.bio,
+        profileImage: response.data.profileImage
+      }));
+
+      // Update the user state in Redux
       dispatch(updateUser(response.data));
+      
       toast.success('Profile updated successfully');
     } catch (error) {
-      toast.error('Failed to update profile');
+      toast.error(error.response?.data?.message || 'Failed to update profile');
       console.error('Error updating profile:', error);
     } finally {
       setLoading(false);
@@ -83,7 +145,7 @@ const DonorProfile = () => {
             <div className="relative">
               <Avatar className="h-24 w-24">
                 <AvatarImage src={formData.profileImage} />
-                <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
+                <AvatarFallback>{formData.name?.charAt(0)}</AvatarFallback>
               </Avatar>
               <input
                 type="file"
@@ -111,8 +173,8 @@ const DonorProfile = () => {
               </label>
             </div>
             <div>
-              <h2 className="text-xl font-semibold">{user?.name}</h2>
-              <p className="text-muted-foreground">{user?.email}</p>
+              <h2 className="text-xl font-semibold">{formData.name}</h2>
+              <p className="text-muted-foreground">{formData.email}</p>
             </div>
           </div>
 
@@ -122,7 +184,7 @@ const DonorProfile = () => {
               <Input
                 id="name"
                 name="name"
-                value={formData.name}
+                value={formData.name || ''}
                 onChange={handleChange}
                 required
               />
@@ -134,7 +196,7 @@ const DonorProfile = () => {
                 id="email"
                 name="email"
                 type="email"
-                value={formData.email}
+                value={formData.email || ''}
                 onChange={handleChange}
                 required
                 disabled
@@ -142,12 +204,14 @@ const DonorProfile = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
+              <Label htmlFor="phone">Phone Number (10 digits)</Label>
               <Input
                 id="phone"
                 name="phone"
-                value={formData.phone}
+                value={formData.phone || ''}
                 onChange={handleChange}
+                maxLength={10}
+                placeholder="Enter 10 digit number"
               />
             </div>
 
@@ -156,7 +220,7 @@ const DonorProfile = () => {
               <Input
                 id="address"
                 name="address"
-                value={formData.address}
+                value={formData.address || ''}
                 onChange={handleChange}
               />
             </div>
@@ -167,7 +231,7 @@ const DonorProfile = () => {
             <Textarea
               id="bio"
               name="bio"
-              value={formData.bio}
+              value={formData.bio || ''}
               onChange={handleChange}
               rows={4}
             />

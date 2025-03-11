@@ -2,6 +2,8 @@ import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useEffect } from "react";
 import Register from "@/components/Register.jsx";
 import Login from "@/components/Login.jsx";
+import ForgotPassword from "@/components/ForgotPassword.jsx";
+import ResetPassword from "@/components/ResetPassword.jsx";
 import FundraiserDashboard from "@/components/FundraiserDashboard.jsx";
 import Donor from "@/components/Donor.jsx";
 import Home from "@/components/Home.jsx";
@@ -73,6 +75,8 @@ const App = () => {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/causes" element={<CauseList />} />
         <Route path="/causes/:id" element={<CauseDetail />} />
         <Route path="/payment-success" element={<PaymentSuccess />} />

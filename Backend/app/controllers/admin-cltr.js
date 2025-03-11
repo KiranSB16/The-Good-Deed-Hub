@@ -72,11 +72,16 @@ adminCltr.approveCause = async(req , res) => {
             return res.status(404).json({ message: "Cause not found" });
         }
         
+        if (!cause.fundraiserId || !cause.fundraiserId.email) {
+            console.error("Fundraiser email not found for cause:", id);
+            return res.status(400).json({ message: "Fundraiser email not found" });
+        }
+        
         cause.status = "approved";
         cause.rejectionMessage = null;
         await cause.save();
         
-        await notifyCauseApproval(cause.fundraiserId, cause);
+        await notifyCauseApproval(cause.fundraiserId, cause, cause.fundraiserId.email);
         
         res.status(200).json({
             message: "Cause approved successfully",

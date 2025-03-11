@@ -1,22 +1,8 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from '../config/axios';
+import axios from '@/lib/axios';
 import { toast } from 'react-hot-toast';
 
 // Async thunks
-export const fetchDonorDonations = createAsyncThunk(
-  'donor/fetchDonations',
-  async (_, { rejectWithValue }) => {
-    try {
-      const response = await axios.get('/donations/my-donations');
-      return response.data;
-    } catch (error) {
-      const message = error.response?.data?.message || 'Failed to fetch donations';
-      toast.error(message);
-      return rejectWithValue(message);
-    }
-  }
-);
-
 export const fetchDonorProfile = createAsyncThunk(
   'donor/fetchProfile',
   async (_, { rejectWithValue }) => {
@@ -24,9 +10,6 @@ export const fetchDonorProfile = createAsyncThunk(
       const response = await axios.get('/donor/profile');
       return response.data;
     } catch (error) {
-      if (error.response?.status === 404) {
-        return null; // Profile doesn't exist yet
-      }
       const message = error.response?.data?.message || 'Failed to fetch profile';
       toast.error(message);
       return rejectWithValue(message);
@@ -49,19 +32,14 @@ export const updateDonorProfile = createAsyncThunk(
   }
 );
 
-export const makeDonation = createAsyncThunk(
-  'donor/makeDonation',
-  async ({ causeId, amount, message }, { rejectWithValue }) => {
+export const fetchDonorDonations = createAsyncThunk(
+  'donor/fetchDonations',
+  async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.post('/donations', {
-        causeId,
-        amount,
-        message,
-      });
-      toast.success('Donation successful');
+      const response = await axios.get('/donor/donations');
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to process donation';
+      const message = error.response?.data?.message || 'Failed to fetch donations';
       toast.error(message);
       return rejectWithValue(message);
     }
@@ -108,25 +86,6 @@ const donorSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Fetch Donations
-      .addCase(fetchDonorDonations.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchDonorDonations.fulfilled, (state, action) => {
-        state.loading = false;
-        state.donations = action.payload.donations || [];
-        if (action.payload.stats) {
-          state.stats = {
-            ...state.stats,
-            ...action.payload.stats
-          };
-        }
-      })
-      .addCase(fetchDonorDonations.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
       // Fetch Profile
       .addCase(fetchDonorProfile.pending, (state) => {
         state.loading = true;
@@ -153,24 +112,22 @@ const donorSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // Make Donation
-      .addCase(makeDonation.pending, (state) => {
+      // Fetch Donations
+      .addCase(fetchDonorDonations.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(makeDonation.fulfilled, (state, action) => {
+      .addCase(fetchDonorDonations.fulfilled, (state, action) => {
         state.loading = false;
-        state.donations = [action.payload.donation, ...state.donations];
-        // Update stats
-        state.stats.totalDonations += 1;
-        state.stats.totalAmount += action.payload.donation.amount;
-        if (action.payload.donation.status === 'completed') {
-          state.stats.completedDonations += 1;
-        } else {
-          state.stats.pendingDonations += 1;
+        state.donations = action.payload.donations;
+        if (action.payload.stats) {
+          state.stats = {
+            ...state.stats,
+            ...action.payload.stats
+          };
         }
       })
-      .addCase(makeDonation.rejected, (state, action) => {
+      .addCase(fetchDonorDonations.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
@@ -181,10 +138,7 @@ const donorSlice = createSlice({
       })
       .addCase(fetchDonorStats.fulfilled, (state, action) => {
         state.loading = false;
-        state.stats = {
-          ...state.stats,
-          ...action.payload
-        };
+        state.stats = action.payload;
       })
       .addCase(fetchDonorStats.rejected, (state, action) => {
         state.loading = false;
@@ -194,4 +148,5 @@ const donorSlice = createSlice({
 });
 
 export const { clearError, updateStats } = donorSlice.actions;
+
 export default donorSlice.reducer; 

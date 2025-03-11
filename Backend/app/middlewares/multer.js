@@ -22,11 +22,22 @@
 // export default upload
 
 import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+
+// Create uploads directory if it doesn't exist
+const uploadDir = 'uploads';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
   filename: function (req, file, cb) {
-    console.log("In the filename")
-    cb(null, file.originalname);
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }
 });
 console.log("in the multer")

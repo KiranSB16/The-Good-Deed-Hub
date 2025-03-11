@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { toast } from 'react-hot-toast';
-import axios from '../../config/axios';
+import axios from '@/lib/axios';
 
 export default function AdminCauseDetails() {
   const { id } = useParams();

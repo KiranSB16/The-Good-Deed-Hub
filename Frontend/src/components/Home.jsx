@@ -85,7 +85,7 @@ export default function Home() {
                   className="bg-blue-600 hover:bg-blue-700 text-white text-lg px-8 py-6 shadow-lg transition-colors duration-200"
                   onClick={() => navigate("/register")}
                 >
-                  Start a Campaign
+                  Register
                 </Button>
                 <Button
                   size="lg"

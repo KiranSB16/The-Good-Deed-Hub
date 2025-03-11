@@ -1,4 +1,3 @@
-
 import mongoose from "mongoose"
 import {Schema , model} from 'mongoose'
 const causeSchema = new Schema({
@@ -8,8 +7,12 @@ const causeSchema = new Schema({
   fundraiserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User'},
   goalAmount: Number,
   currentAmount: { type: Number, default: 0 },
-  status: { type: String, enum: ['approved', 'rejected', 'pending approval'], default: 'pending approval' },
-  rejectionMessage: { type: String, default: null },
+  status: { 
+    type: String, 
+    enum: ['approved', 'rejected', 'pending', 'completed'], 
+    default: 'pending'
+  },
+  rejectionReason: { type: String, default: null },
   images: [String],
   documents : [String],
   shareLink: String,
