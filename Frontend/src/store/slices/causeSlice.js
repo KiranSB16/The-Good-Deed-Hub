@@ -3,6 +3,19 @@ import axios from '../../config/axios';
 import { toast } from 'react-hot-toast';
 
 // Async thunks for API calls
+export const fetchCauses = createAsyncThunk(
+  'cause/fetchCauses',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await axios.get('/causes');
+      return response.data.causes;
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to fetch causes');
+      return rejectWithValue(error.response?.data || 'Failed to fetch causes');
+    }
+  }
+);
+
 export const fetchPendingCauses = createAsyncThunk(
   'cause/fetchPendingCauses',
   async (_, { rejectWithValue }) => {
@@ -66,6 +79,19 @@ const causeSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // Fetch Causes
+      .addCase(fetchCauses.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchCauses.fulfilled, (state, action) => {
+        state.loading = false;
+        state.causes = action.payload;
+      })
+      .addCase(fetchCauses.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
       // Fetch Pending Causes
       .addCase(fetchPendingCauses.pending, (state) => {
         state.loading = true;

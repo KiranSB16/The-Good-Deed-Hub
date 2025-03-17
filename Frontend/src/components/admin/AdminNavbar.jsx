@@ -52,6 +52,7 @@ export default function AdminNavbar() {
               <NavLink to="/admin/causes">Causes</NavLink>
               <NavLink to="/admin/categories">Categories</NavLink>
               <NavLink to="/admin/users">Users</NavLink>
+              <NavLink to="/admin/analytics">Analytics</NavLink>
             </div>
             
             <Button

@@ -9,22 +9,50 @@ import {createCauseValidation} from "../validators/cause-validation-schema.js"
 
 const router = express.Router();
 
-router.post('/', upload.fields([
-  { name: "images", maxCount: 4 }, // Max 5 images
-  { name: "documents", maxCount: 1 }, // Max 3 documents
-  ]),
-  AuthenticateUser, 
-  authorizeUser(['fundraiser']),
-  handleValidationErrors(createCauseValidation) , 
-  causeCltr.create)
+// Create a new cause
+router.post('/', 
+    upload.fields([
+        { name: "images", maxCount: 4 },
+        { name: "documents", maxCount: 1 }
+    ]),
+    AuthenticateUser, 
+    authorizeUser(['fundraiser']),
+    handleValidationErrors(createCauseValidation), 
+    causeCltr.create
+);
 
-router.get('/' , AuthenticateUser, causeCltr.list)
-router.get('/:id' , AuthenticateUser, causeCltr.show)
-router.put('/:id' , AuthenticateUser, authorizeUser(['fundraiser', 'admin']), causeCltr.update)
-router.delete('/:id' , AuthenticateUser, authorizeUser(['fundraiser', 'admin']), causeCltr.delete)
+// List all causes
+router.get('/', AuthenticateUser, causeCltr.list);
 
-// Add approval and rejection routes
-router.put('/:id/approve', AuthenticateUser, authorizeUser(['admin']), causeCltr.approve)
-router.put('/:id/reject', AuthenticateUser, authorizeUser(['admin']), causeCltr.reject)
+// Get a single cause
+router.get('/:id', AuthenticateUser, causeCltr.show);
+
+// Update a cause
+router.put('/:id', 
+    upload.fields([
+        { name: "images", maxCount: 4 },
+        { name: "documents", maxCount: 1 }
+    ]),
+    AuthenticateUser, 
+    authorizeUser(['fundraiser', 'admin']), 
+    causeCltr.update
+);
+
+// Delete a cause
+router.delete('/:id', 
+    AuthenticateUser, 
+    authorizeUser(['fundraiser', 'admin']), 
+    causeCltr.delete
+);
+
+// Update cause status (approve/reject)
+router.put('/:id/status', 
+    AuthenticateUser, 
+    authorizeUser(['admin']), 
+    causeCltr.updateStatus
+);
+
+// Get donations for a specific cause
+router.get('/:id/donations', AuthenticateUser, causeCltr.getDonations);
 
 export default router

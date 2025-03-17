@@ -12,7 +12,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Heart, Share2, IndianRupee } from 'lucide-react';
-import { Badge } from "@/components/ui/badge";
+import Badge from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function SavedCauses() {
@@ -28,7 +28,7 @@ export default function SavedCauses() {
   const fetchSavedCauses = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/donor/saved-causes');
+      const response = await axios.get('/donors/saved-causes');
       setCauses(response.data.savedCauses);
       setLoading(false);
     } catch (error) {
@@ -40,7 +40,7 @@ export default function SavedCauses() {
 
   const handleUnsave = async (causeId) => {
     try {
-      await axios.delete(`/donor/saved-causes/${causeId}`);
+      await axios.delete(`/donors/saved-causes/${causeId}`);
       setCauses(causes.filter(cause => cause._id !== causeId));
       toast.success('Cause removed from saved list');
     } catch (error) {

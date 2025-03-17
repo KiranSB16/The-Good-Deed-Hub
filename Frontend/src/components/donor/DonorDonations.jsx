@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import Badge from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { Heart, ArrowRight } from 'lucide-react';
 import { fetchDonorDonations } from '@/slices/donorSlice';
@@ -49,7 +50,7 @@ const DonorDonations = () => {
             <CardDescription>Amount contributed</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">${totalAmount.toLocaleString()}</p>
+            <p className="text-3xl font-bold">₹{totalAmount.toLocaleString()}</p>
           </CardContent>
         </Card>
         <Card>
@@ -89,10 +90,10 @@ const DonorDonations = () => {
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-2xl font-bold">
-                      ${donation.amount.toLocaleString()}
+                      ₹{donation.amount.toLocaleString()}
                     </span>
-                    <Badge variant={donation.status === 'completed' ? 'success' : 'warning'}>
-                      {donation.status}
+                    <Badge variant={donation.status === 'completed' ? 'default' : 'secondary'} className={donation.status === 'completed' ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500'}>
+                      {donation.status.charAt(0).toUpperCase() + donation.status.slice(1)}
                     </Badge>
                   </div>
                 </div>

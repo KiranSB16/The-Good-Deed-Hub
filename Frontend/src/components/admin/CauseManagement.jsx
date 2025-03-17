@@ -9,34 +9,35 @@ import {
   fetchCauses,
   clearSelectedCause
 } from '../../slices/causeSlice';
-import { useNavigate, useLocation } from 'react-router-dom';
-import axios from '@/lib/axios';
+import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 
 export default function CauseManagement() {
   const dispatch = useDispatch();
-  const location = useLocation();
-  const { causes = [], loading, selectedCause, error } = useSelector((state) => state.causes);
+  const { causes = [], loading, error } = useSelector((state) => state.causes);
   const [rejectionReason, setRejectionReason] = useState('');
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [selectedDocument, setSelectedDocument] = useState(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const loadPendingCauses = async () => {
-      try {
-        await dispatch(fetchCauses()).unwrap();
-      } catch (error) {
-        toast.error('Failed to fetch pending causes');
-      }
-    };
+  // Function to refresh causes data
+  const refreshCauses = async () => {
+    try {
+      await dispatch(fetchCauses({ status: 'pending' })).unwrap();
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      toast.error('Failed to fetch causes');
+    }
+  };
 
-    loadPendingCauses();
-  }, [dispatch]);
+  // Initial load
+  useEffect(() => {
+    refreshCauses();
+  }, []);
 
   const handleApprove = async (causeId) => {
     try {
       await dispatch(approveCause(causeId)).unwrap();
       toast.success('Cause approved successfully');
+      refreshCauses(); // Refresh the list after approval
     } catch (error) {
       toast.error('Failed to approve cause');
     }
@@ -52,25 +53,34 @@ export default function CauseManagement() {
       await dispatch(rejectCause({ causeId, reason: rejectionReason })).unwrap();
       setRejectionReason('');
       toast.success('Cause rejected successfully');
+      refreshCauses(); // Refresh the list after rejection
     } catch (error) {
       toast.error('Failed to reject cause');
     }
   };
 
-  const pendingCauses = causes.filter(cause => cause.status === 'pending');
-
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
   }
 
   if (error) {
     return <div>Error: {error}</div>;
   }
 
+  // Filter pending causes
+  const pendingCauses = Array.isArray(causes) ? causes.filter(cause => 
+    cause.status === 'pending' || cause.status === 'pending approval'
+  ) : [];
+
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6">Cause Management</h1>
+      <h1 className="text-2xl font-bold mb-6">Pending Causes</h1>
 
+      {/* Causes List */}
       {pendingCauses.length === 0 ? (
         <div className="text-center py-8">
           <p className="text-lg text-gray-600">No pending causes to review</p>
@@ -84,9 +94,10 @@ export default function CauseManagement() {
                   <h2 className="text-xl font-semibold">{cause.title}</h2>
                   <p className="text-gray-600 mt-2">{cause.description}</p>
                   <div className="mt-4">
-                    <p><strong>Goal Amount:</strong> ${cause.goalAmount?.toLocaleString()}</p>
+                    <p><strong>Goal Amount:</strong> ₹{cause.goalAmount?.toLocaleString()}</p>
                     <p><strong>Category:</strong> {cause.category?.name}</p>
                     <p><strong>Fundraiser:</strong> {cause.fundraiserId?.name}</p>
+                    <p><strong>Status:</strong> <span className="px-2 py-1 rounded text-sm bg-yellow-100 text-yellow-800">{cause.status}</span></p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -102,51 +113,13 @@ export default function CauseManagement() {
                   >
                     Reject
                   </Button>
+                  <Button
+                    onClick={() => navigate(`/admin/causes/${cause._id}`)}
+                    variant="outline"
+                  >
+                    View Details
+                  </Button>
                 </div>
-              </div>
-              
-              {cause.images?.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="font-semibold mb-2">Images</h3>
-                  <div className="grid grid-cols-4 gap-2">
-                    {cause.images.map((image, index) => (
-                      <img
-                        key={index}
-                        src={image}
-                        alt={`Cause image ${index + 1}`}
-                        className="w-full h-24 object-cover rounded"
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {cause.documents?.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="font-semibold mb-2">Documents</h3>
-                  <div className="space-y-2">
-                    {cause.documents.map((doc, index) => (
-                      <a
-                        key={index}
-                        href={doc}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-500 hover:underline block"
-                      >
-                        View Document {index + 1}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-4">
-                <Textarea
-                  placeholder="Reason for rejection (required for rejecting)"
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  className="w-full"
-                />
               </div>
             </div>
           ))}

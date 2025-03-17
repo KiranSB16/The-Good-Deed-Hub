@@ -158,14 +158,16 @@ const DonorDashboard = () => {
 
       {/* Causes grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loading ? (
+        {loading || causesLoading ? (
           Array(6).fill(0).map((_, i) => (
             <Card key={i} className="h-[400px] animate-pulse" />
           ))
-        ) : error ? (
-          <div className="col-span-full text-center text-red-500">{error}</div>
-        ) : (
+        ) : causesError ? (
+          <div className="col-span-full text-center text-red-500">{causesError}</div>
+        ) : Array.isArray(causes) && causes.length > 0 ? (
           causes.map(cause => <CauseCard key={cause._id} cause={cause} />)
+        ) : (
+          <div className="col-span-full text-center text-gray-500">No causes found</div>
         )}
       </div>
     </div>

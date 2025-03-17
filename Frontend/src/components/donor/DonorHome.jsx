@@ -13,7 +13,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Heart, Share2, IndianRupee } from 'lucide-react';
-import { Badge } from "@/components/ui/badge";
+import Badge from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function DonorHome() {
@@ -42,7 +42,7 @@ export default function DonorHome() {
 
   const fetchSavedCauses = async () => {
     try {
-      const response = await axios.get('/donor/saved-causes');
+      const response = await axios.get('/donors/saved-causes');
       setSavedCauses(response.data.savedCauses);
     } catch (error) {
       console.error('Error fetching saved causes:', error);

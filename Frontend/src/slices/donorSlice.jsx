@@ -7,7 +7,7 @@ export const fetchDonorProfile = createAsyncThunk(
   'donor/fetchProfile',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get('/donor/profile');
+      const response = await axios.get('/donors/profile');
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || 'Failed to fetch profile';
@@ -21,7 +21,7 @@ export const updateDonorProfile = createAsyncThunk(
   'donor/updateProfile',
   async (profileData, { rejectWithValue }) => {
     try {
-      const response = await axios.put('/donor/profile', profileData);
+      const response = await axios.put('/donors/profile', profileData);
       toast.success('Profile updated successfully');
       return response.data;
     } catch (error) {
@@ -36,7 +36,7 @@ export const fetchDonorDonations = createAsyncThunk(
   'donor/fetchDonations',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get('/donor/donations');
+      const response = await axios.get('/donors/donations');
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || 'Failed to fetch donations';
@@ -50,7 +50,7 @@ export const fetchDonorStats = createAsyncThunk(
   'donor/fetchStats',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get('/donor/stats');
+      const response = await axios.get('/donors/stats');
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || 'Failed to fetch statistics';

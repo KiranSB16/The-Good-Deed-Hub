@@ -5,9 +5,16 @@ import { toast } from 'react-hot-toast';
 // Async thunks
 export const fetchCauses = createAsyncThunk(
   'causes/fetchAll',
-  async (_, { rejectWithValue }) => {
+  async ({ page = 1, search = '', category = '', sort = 'newest' }, { rejectWithValue }) => {
     try {
-      const response = await axios.get('/causes');
+      const response = await axios.get('/causes', {
+        params: {
+          page,
+          search,
+          category,
+          sort
+        }
+      });
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || 'Failed to fetch causes';

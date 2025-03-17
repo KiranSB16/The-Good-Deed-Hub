@@ -1,61 +1,124 @@
-import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { CheckCircle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import axios from '@/lib/axios';
+import { Loader2, CheckCircle } from 'lucide-react';
 
 const PaymentSuccess = () => {
-  const navigate = useNavigate();
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const [verificationAttempts, setVerificationAttempts] = useState(0);
+    const [isVerifying, setIsVerifying] = useState(true);
+    const [redirectCountdown, setRedirectCountdown] = useState(5);
+    const [donation, setDonation] = useState(null);
+    const [shouldRedirect, setShouldRedirect] = useState(false);
 
-  useEffect(() => {
-    // Auto-redirect to dashboard after 5 seconds
-    const timer = setTimeout(() => {
-      navigate('/donor/dashboard');
-    }, 5000);
+    useEffect(() => {
+        const verifyPayment = async () => {
+            const sessionId = searchParams.get('session_id');
+            if (!sessionId) {
+                toast.error('Session ID is missing');
+                setShouldRedirect(true);
+                return;
+            }
 
-    return () => clearTimeout(timer);
-  }, [navigate]);
+            try {
+                setIsVerifying(true);
+                const response = await axios.get(`/payments/verify-session/${sessionId}`);
+                
+                if (response.data.success && response.data.donation) {
+                    const { donation } = response.data;
+                    setDonation(donation);
+                    
+                    // Log the cause data for debugging
+                    console.log('Received cause data:', {
+                        causeId: donation.causeId._id,
+                        currentAmount: donation.causeId.currentAmount,
+                        goalAmount: donation.causeId.goalAmount
+                    });
 
-  return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-      <Card className="max-w-md w-full">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <CheckCircle className="h-16 w-16 text-green-500" />
-          </div>
-          <CardTitle className="text-2xl font-bold text-green-600">
-            Payment Successful!
-          </CardTitle>
-          <CardDescription className="text-lg">
-            Thank you for your generous donation
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-center text-muted-foreground">
-            Your donation has been processed successfully. You're making a real difference!
-          </p>
-          <div className="text-center text-sm text-muted-foreground">
-            You will be redirected to your dashboard in a few seconds...
-          </div>
-          <div className="flex flex-col gap-2">
-            <Button 
-              onClick={() => navigate('/donor/dashboard')}
-              className="w-full"
-            >
-              Go to Dashboard
-            </Button>
-            <Button 
-              variant="outline"
-              onClick={() => navigate('/causes')}
-              className="w-full"
-            >
-              Explore More Causes
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+                    toast.success('Payment verified successfully!');
+                    setIsVerifying(false);
+                    setShouldRedirect(true);
+                } else {
+                    throw new Error('Invalid response format');
+                }
+            } catch (error) {
+                console.error('Payment verification error:', error);
+                
+                if (verificationAttempts < 2) {
+                    setVerificationAttempts(prev => prev + 1);
+                    setTimeout(() => verifyPayment(), 2000); // Retry after 2 seconds
+                } else {
+                    toast.error('Failed to verify payment. Please contact support.');
+                    setIsVerifying(false);
+                    setShouldRedirect(true);
+                }
+            }
+        };
+
+        verifyPayment();
+    }, [searchParams, verificationAttempts]); // Added proper dependencies
+
+    useEffect(() => {
+        let timer;
+        if (shouldRedirect) {
+            timer = setInterval(() => {
+                setRedirectCountdown(prev => {
+                    if (prev <= 1) {
+                        clearInterval(timer);
+                        // Navigate to donor's donations page
+                        navigate('/donor/dashboard/donations');
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        }
+        return () => clearInterval(timer);
+    }, [shouldRedirect, navigate]);
+
+    return (
+        <div className="container mx-auto max-w-md px-4 py-8">
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
+                {isVerifying ? (
+                    <>
+                        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                        <h2 className="text-xl font-semibold">
+                            Verifying your payment...
+                        </h2>
+                        {verificationAttempts > 0 && (
+                            <p className="text-sm text-gray-500">
+                                Retrying verification... Attempt {verificationAttempts + 1}/3
+                            </p>
+                        )}
+                    </>
+                ) : donation ? (
+                    <>
+                        <CheckCircle className="h-12 w-12 text-green-500" />
+                        <h1 className="text-2xl font-bold text-primary">
+                            Thank you for your donation!
+                        </h1>
+                        <p className="text-lg text-gray-700">
+                            Your donation of ₹{donation.amount} to "{donation.causeId.title}" has been processed successfully.
+                        </p>
+                        <p className="text-sm text-gray-500">
+                            Redirecting to your donations page in {redirectCountdown} seconds...
+                        </p>
+                    </>
+                ) : (
+                    <div className="text-center text-red-600">
+                        <h2 className="text-xl font-semibold">
+                            Payment verification failed. Please contact support.
+                        </h2>
+                        <p className="text-sm text-gray-500 mt-2">
+                            Redirecting to dashboard in {redirectCountdown} seconds...
+                        </p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 export default PaymentSuccess; 

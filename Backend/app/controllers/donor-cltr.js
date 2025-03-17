@@ -273,7 +273,7 @@ donorCltr.getDonations = async (req, res) => {
         }
 
         // Find donations with proper population
-        const donations = await Donation.find({ donorId: req.user.userId })
+        const donations = await Donation.find({ donorId: donor._id })
             .populate({
                 path: 'causeId',
                 populate: [

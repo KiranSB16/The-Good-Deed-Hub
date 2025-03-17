@@ -4,7 +4,7 @@ import { Schema, model } from "mongoose"
 const donationSchema = new Schema({
     donorId: { 
         type: mongoose.Schema.Types.ObjectId, 
-        ref: 'Donor', 
+        ref: 'Donor',
         required: true 
     },
     causeId: { 
@@ -15,7 +15,24 @@ const donationSchema = new Schema({
     amount: { 
         type: Number, 
         required: true,
-        min: 1
+        min: 0
+    },
+    platformFee: {
+        type: Number,
+        required: true,
+        default: 0
+    },
+    totalAmount: {
+        type: Number,
+        required: true
+    },
+    message: { 
+        type: String,
+        trim: true
+    },
+    isAnonymous: {
+        type: Boolean,
+        default: false
     },
     status: { 
         type: String, 
@@ -23,18 +40,19 @@ const donationSchema = new Schema({
         default: 'pending'
     },
     transactionId: { 
-        type: String 
+        type: String,
+        index: true
     },
     paymentMethod: { 
-        type: String 
-    },
-    message: { 
         type: String,
-        maxLength: 500 
+        required: true,
+        enum: ['stripe', 'other']
     }
 }, {
     timestamps: true
 })
+
+donationSchema.index({ donorId: 1, causeId: 1 });
 
 const Donation = model("Donation", donationSchema)
 export default Donation

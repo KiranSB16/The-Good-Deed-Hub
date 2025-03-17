@@ -3,18 +3,27 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { toast } from 'react-hot-toast';
 import axios from '@/lib/axios';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [stats, setStats] = useState({
-    pendingCauses: 0,
-    activeCauses: 0,
-    completedCauses: 0,
-    totalGoalAmount: 0
-  });
   const [activeCauses, setActiveCauses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('all');
+  const [sort, setSort] = useState('newest');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(6);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -23,43 +32,102 @@ export default function AdminDashboard() {
       return;
     }
     fetchDashboardData();
+    fetchCategories();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch categories
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get('/categories');
+      setCategories(response.data);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      toast.error('Failed to fetch categories');
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch causes with different statuses
-      const [pendingCauses, approvedCauses, completedCauses] = await Promise.all([
-        axios.get('/causes?status=pending'),
-        axios.get('/causes?status=approved'),
-        axios.get('/causes?status=completed')
-      ]);
-
-      // Calculate total goal amount from approved causes
-      const totalGoalAmount = approvedCauses.data.reduce(
-        (sum, cause) => sum + (cause.goalAmount || 0),
-        0
-      );
-      
-      setStats({
-        pendingCauses: pendingCauses.data.length || 0,
-        activeCauses: approvedCauses.data.length || 0,
-        completedCauses: completedCauses.data.length || 0,
-        totalGoalAmount
-      });
-
-      // Set active causes
-      setActiveCauses(approvedCauses.data);
+      // Fetch approved causes
+      const approvedCauses = await axios.get('/causes?status=approved');
+      const approvedCausesArray = Array.isArray(approvedCauses.data.causes) ? approvedCauses.data.causes : [];
+      setActiveCauses(approvedCausesArray);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       const errorMessage = error.response?.data?.message || 'Failed to fetch dashboard data';
       toast.error(errorMessage);
       setError(errorMessage);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Filter and sort active causes
+  const getFilteredAndSortedCauses = () => {
+    let filteredCauses = [...activeCauses];
+
+    // Apply search filter
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredCauses = filteredCauses.filter(cause =>
+        cause.title.toLowerCase().includes(searchLower) ||
+        cause.description.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply category filter
+    if (category !== 'all') {
+      filteredCauses = filteredCauses.filter(cause =>
+        cause.category?.name === category
+      );
+    }
+
+    // Apply sorting
+    switch (sort) {
+      case 'newest':
+        filteredCauses.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        break;
+      case 'oldest':
+        filteredCauses.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        break;
+      case 'highest':
+        filteredCauses.sort((a, b) => b.goalAmount - a.goalAmount);
+        break;
+      case 'lowest':
+        filteredCauses.sort((a, b) => a.goalAmount - b.goalAmount);
+        break;
+      default:
+        break;
+    }
+
+    return filteredCauses;
+  };
+
+  const handleSearch = (e) => {
+    setSearch(e.target.value);
+    setCurrentPage(1); // Reset to first page when searching
+  };
+
+  const handleCategoryChange = (value) => {
+    setCategory(value);
+    setCurrentPage(1); // Reset to first page when changing category
+  };
+
+  const handleSortChange = (value) => {
+    setSort(value);
+    setCurrentPage(1); // Reset to first page when changing sort
+  };
+
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
   };
 
   const StatCard = ({ title, value, subtitle, className = '' }) => (
@@ -156,42 +224,19 @@ export default function AdminDashboard() {
     );
   }
 
+  const filteredCauses = getFilteredAndSortedCauses();
+  const totalPages = Math.ceil(filteredCauses.length / itemsPerPage);
+  const paginatedCauses = filteredCauses.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
-          <Button
-            onClick={() => navigate('/admin/causes')}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg"
-          >
-            Review Pending Causes
-          </Button>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard
-            title="Pending Causes"
-            value={stats.pendingCauses}
-            className="border-l-4 border-yellow-500"
-          />
-          <StatCard
-            title="Active Causes"
-            value={stats.activeCauses}
-            className="border-l-4 border-green-500"
-          />
-          <StatCard
-            title="Completed Causes"
-            value={stats.completedCauses}
-            className="border-l-4 border-blue-500"
-          />
-          <StatCard
-            title="Total Goal Amount"
-            value={`₹${stats.totalGoalAmount.toLocaleString()}`}
-            className="border-l-4 border-purple-500"
-          />
         </div>
 
         {/* Active Causes Section */}
@@ -200,25 +245,97 @@ export default function AdminDashboard() {
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
               Active Causes
             </h2>
-            <Button
-              onClick={() => navigate('/admin/causes?status=approved')}
-              className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-              variant="ghost"
-            >
-              View All
-            </Button>
+          </div>
+
+          {/* Search and Filter Section */}
+          <div className="mb-8 space-y-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
+                  <Input
+                    placeholder="Search causes..."
+                    value={search}
+                    onChange={handleSearch}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <Select value={category} onValueChange={handleCategoryChange}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat._id} value={cat.name}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={sort} onValueChange={handleSortChange}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest">Newest First</SelectItem>
+                    <SelectItem value="oldest">Oldest First</SelectItem>
+                    <SelectItem value="highest">Highest Amount</SelectItem>
+                    <SelectItem value="lowest">Lowest Amount</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
           
-          {activeCauses.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {activeCauses.map((cause) => (
-                <CauseCard key={cause._id} cause={cause} />
-              ))}
-            </div>
+          {paginatedCauses.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {paginatedCauses.map((cause) => (
+                  <CauseCard key={cause._id} cause={cause} />
+                ))}
+              </div>
+              
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-4 mt-8">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-12">
               <p className="text-gray-500 dark:text-gray-400 text-lg">
-                No active causes at the moment.
+                No active causes found matching your criteria.
               </p>
             </div>
           )}

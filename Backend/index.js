@@ -34,7 +34,7 @@ app.use(cors({
 // Handle raw body for Stripe webhooks
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 
-// Parse JSON for all other routes
+// Parse JSON bodies for all other routes
 app.use(express.json());
 
 // Create uploads directory if it doesn't exist
@@ -51,15 +51,21 @@ app.use("/api/users", userRoutes);
 app.use("/api/causes", causeRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/fundraiser", fundraiserRoutes);
-app.use("/api/donor", donorRoutes);
+app.use("/api/fundraisers", fundraiserRoutes);
+app.use("/api/donors", donorRoutes);
 app.use("/api/donations", donationRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/reviews", reviewRoutes);
-app.use("/api/upload", uploadRoutes);
+app.use("/api/uploads", uploadRoutes);
 app.use("/api/payments", paymentRoutes);
 // Temporarily comment out payment routes
 // app.use("/api/payments", paymentRoutes);
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({ message: 'Internal server error' });
+});
 
 app.listen(port, () => {
     console.log("Server running on port", port);

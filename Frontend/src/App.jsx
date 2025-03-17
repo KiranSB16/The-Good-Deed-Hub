@@ -19,6 +19,7 @@ import CategoryManagement from './components/admin/CategoryManagement';
 import CauseManagement from './components/admin/CauseManagement';
 import UserManagement from './components/admin/UserManagement';
 import AdminCauseDetails from './components/admin/AdminCauseDetails';
+import Analytics from './components/admin/Analytics';
 import DonorLayout from './components/donor/DonorLayout';
 import DonorDashboard from './components/donor/DonorDashboard';
 import DonorProfile from './components/donor/DonorProfile';
@@ -28,7 +29,7 @@ import FundraiserProfile from './components/FundraiserProfile';
 import FundraiserCauses from './components/FundraiserCauses';
 import EditCause from './components/EditCause';
 import { useSelector, useDispatch } from 'react-redux';
-import PaymentSuccess from './components/PaymentSuccess';
+import PaymentSuccess from '@/pages/PaymentSuccess';
 import PaymentFailed from "@/pages/PaymentFailed";
 
 // Protected Route component with role check
@@ -103,6 +104,7 @@ const App = () => {
           <Route path="causes/:id" element={<AdminCauseDetails />} />
           <Route path="categories" element={<CategoryManagement />} />
           <Route path="users" element={<UserManagement />} />
+          <Route path="analytics" element={<Analytics />} />
         </Route>
 
         <Route

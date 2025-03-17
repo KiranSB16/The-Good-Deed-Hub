@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Progress } from "./ui/progress";
 import { Heart, Users, IndianRupee, Shield, Clock, TrendingUp, ArrowRight, Sparkles, Target, Globe, Network, Star, CheckCircle2 } from "lucide-react";
-import { Badge } from "./ui/badge";
+import Badge from "./ui/badge";
 
 export default function Home() {
   const navigate = useNavigate();

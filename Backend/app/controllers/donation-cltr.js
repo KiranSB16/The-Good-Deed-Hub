@@ -43,9 +43,9 @@ donationCltr.create = async (req, res) => {
             $inc: { totalDonations: amount }
         })
 
-        // Update cause's raised amount
+        // Update cause's current amount
         await Cause.findByIdAndUpdate(causeId, {
-            $inc: { raisedAmount: amount }
+            $inc: { currentAmount: amount }
         })
 
         res.status(201).json({ message: 'Donation successful', donation })

@@ -27,17 +27,25 @@ const CauseDetail = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        // Ensure we have a valid ID
+        if (!id || typeof id === 'object') {
+          toast.error('Invalid cause ID');
+          navigate('/donor/dashboard');
+          return;
+        }
         const response = await axios.get(`/causes/${id}`);
         setCause(response.data);
       } catch (error) {
+        console.error('Error fetching cause:', error);
         toast.error(error.response?.data?.message || 'Error fetching data');
+        navigate('/donor/dashboard');
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [id]);
+  }, [id, navigate]);
 
   const calculateProgress = (raised, goal) => {
     return Math.min((raised / goal) * 100, 100);
@@ -51,25 +59,64 @@ const CauseDetail = () => {
     setShowDonateDialog(true);
   };
 
-  const handleDonationSubmit = (e) => {
-    e.preventDefault();
+  const handleAmountSubmit = () => {
     const amount = parseFloat(donationAmount);
-    
-    if (isNaN(amount) || amount <= 0) {
-      toast.error('Please enter a valid amount');
+    if (!amount || amount < 100) {
+      toast.error('Please enter a valid amount (minimum ₹100)');
       return;
     }
-
     setShowDonateDialog(false);
     setShowPayment(true);
   };
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = async (paymentData) => {
     setShowPayment(false);
+    setShowDonateDialog(false);
     setDonationAmount('');
-    toast.success('Thank you for supporting this cause!');
-    // Refresh the cause data
-    window.location.reload();
+    
+    // Poll for updated cause data with increased timeout
+    let retries = 0;
+    const maxRetries = 10; // Increased from 5 to 10
+    const pollInterval = 2000; // Increased from 1s to 2s
+    const expectedAmount = (cause.currentAmount || 0) + parseFloat(donationAmount);
+
+    const pollForUpdate = async () => {
+      while (retries < maxRetries) {
+        try {
+          const response = await axios.get(`/causes/${id}`);
+          const updatedCause = response.data;
+          
+          // Check if the amount has been updated
+          if (updatedCause.currentAmount >= expectedAmount) {
+            setCause(updatedCause);
+            toast.success('Thank you for supporting this cause!');
+            break;
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          retries++;
+          
+          // If we've reached max retries but still haven't seen the update
+          if (retries === maxRetries) {
+            // Fetch one final time
+            const finalResponse = await axios.get(`/causes/${id}`);
+            setCause(finalResponse.data);
+            toast.success('Thank you for supporting this cause! The page will update shortly.');
+          }
+        } catch (error) {
+          console.error('Error refreshing cause data:', error);
+          if (retries === maxRetries) {
+            toast.error('Please refresh the page to see your updated donation');
+          }
+        }
+      }
+    };
+
+    // Start polling
+    pollForUpdate();
+    
+    // Navigate to donations page
+    navigate('/donor/dashboard/donations');
   };
 
   const handlePaymentCancel = () => {
@@ -125,15 +172,15 @@ const CauseDetail = () => {
             <div className="mb-8">
               <div className="flex justify-between text-sm mb-2">
                 <span>Progress</span>
-                <span>{Math.round(calculateProgress(cause.raisedAmount || 0, cause.goalAmount))}%</span>
+                <span>{Math.round(calculateProgress(cause.currentAmount || 0, cause.goalAmount))}%</span>
               </div>
               <Progress 
-                value={calculateProgress(cause.raisedAmount || 0, cause.goalAmount)} 
+                value={calculateProgress(cause.currentAmount || 0, cause.goalAmount)} 
                 className="h-2"
               />
               <div className="flex justify-between mt-2">
                 <span className="text-sm font-medium">
-                  ₹{(cause.raisedAmount || 0).toLocaleString('en-IN')} raised
+                  ₹{(cause.currentAmount || 0).toLocaleString('en-IN')} raised
                 </span>
                 <span className="text-sm text-gray-500">
                   of ₹{(cause.goalAmount || 0).toLocaleString('en-IN')}
@@ -190,8 +237,11 @@ const CauseDetail = () => {
               <Button onClick={() => window.history.back()} variant="outline">
                 Back
               </Button>
-              {user?.role !== 'admin' && (
-                <Button onClick={handleDonateClick} className="bg-primary text-primary-foreground">
+              {user?.role !== 'admin' && cause.status === 'approved' && (
+                <Button 
+                  onClick={handleDonateClick}
+                  className="bg-primary hover:bg-primary/90"
+                >
                   Donate Now
                 </Button>
               )}
@@ -200,44 +250,54 @@ const CauseDetail = () => {
         </CardContent>
       </Card>
 
-      {/* Donation Amount Dialog */}
+      {/* Amount Input Dialog */}
       <Dialog open={showDonateDialog} onOpenChange={setShowDonateDialog}>
-        <DialogContent>
-          <DialogTitle>Make a Donation</DialogTitle>
-          <form onSubmit={handleDonationSubmit}>
-            <div className="space-y-4">
-              <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                <h3 className="font-semibold mb-2">{cause.title}</h3>
-                <p className="text-sm text-gray-600">{cause.description}</p>
-              </div>
-              <div>
-                <Label htmlFor="amount">Donation Amount (₹)</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  min="100"
-                  step="1"
-                  value={donationAmount}
-                  onChange={(e) => setDonationAmount(e.target.value)}
-                  placeholder="Enter amount (minimum ₹100)"
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full">
+        <DialogContent className="sm:max-w-md" description="Enter the amount you wish to donate">
+          <DialogTitle>Enter Donation Amount</DialogTitle>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="donationAmount">Amount (₹)</Label>
+              <Input
+                id="donationAmount"
+                type="number"
+                min="100"
+                step="1"
+                value={donationAmount}
+                onChange={(e) => setDonationAmount(e.target.value)}
+                placeholder="Enter amount (minimum ₹100)"
+                className="text-lg"
+              />
+              <p className="text-sm text-muted-foreground">
+                Minimum donation amount is ₹100
+              </p>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowDonateDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAmountSubmit}
+                disabled={!donationAmount || parseFloat(donationAmount) < 100}
+              >
                 Continue to Payment
               </Button>
             </div>
-          </form>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Payment Dialog */}
       <Dialog open={showPayment} onOpenChange={setShowPayment}>
-        <DialogContent className="sm:max-w-md">
-          <DialogTitle>Payment Details</DialogTitle>
+        <DialogContent 
+          className="sm:max-w-3xl max-h-[90vh] overflow-y-auto"
+          description="Complete your donation payment securely"
+        >
           <DonationPayment
-            amount={parseFloat(donationAmount)}
-            causeId={cause._id}
+            initialAmount={parseFloat(donationAmount)}
+            causeId={cause?._id}
             cause={cause}
             onSuccess={handlePaymentSuccess}
             onCancel={handlePaymentCancel}

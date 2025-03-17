@@ -2,6 +2,9 @@ import { validationResult } from "express-validator"
 import { notifyCauseApproval, notifyCauseRejection } from "../utils/nodemailer.js"
 import Cause from "../models/cause-model.js"
 import Category from "../models/category-model.js"
+import User from "../models/user-model.js"
+import Donation from "../models/donation-model.js"
+import { analyticsResponseSchema } from "../validators/analytics-validation-schema.js"
 
 const adminCltr = {}
 
@@ -180,6 +183,117 @@ adminCltr.testCauses = async (req, res) => {
         });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+};
+
+// Get analytics data
+adminCltr.getAnalytics = async (req, res) => {
+    try {
+        // Get total users by role
+        const totalUsers = await User.countDocuments();
+        const totalDonors = await User.countDocuments({ role: 'donor' });
+        const totalFundraisers = await User.countDocuments({ role: 'fundraiser' });
+
+        // Get causes statistics
+        const totalCauses = await Cause.countDocuments();
+        const activeCauses = await Cause.countDocuments({ status: 'approved' });
+        const completedCauses = await Cause.countDocuments({ status: 'completed' });
+        const pendingCauses = await Cause.countDocuments({ status: 'pending' });
+
+        // Get total donations and amount
+        const donations = await Donation.find();
+        const totalDonations = donations.length;
+        const totalAmount = donations.reduce((sum, donation) => sum + (donation.amount || 0), 0);
+
+        // Get category distribution for causes
+        const categories = await Category.find();
+        const categoryDistribution = await Promise.all(
+            categories.map(async (category) => {
+                const count = await Cause.countDocuments({ category: category._id });
+                return {
+                    name: category.name,
+                    count
+                };
+            })
+        );
+
+        // Get category-wise donation data
+        const categoryDonations = await Donation.aggregate([
+            {
+                $lookup: {
+                    from: "causes",
+                    localField: "causeId",
+                    foreignField: "_id",
+                    as: "cause"
+                }
+            },
+            {
+                $unwind: "$cause"
+            },
+            {
+                $lookup: {
+                    from: "categories",
+                    localField: "cause.category",
+                    foreignField: "_id",
+                    as: "category"
+                }
+            },
+            {
+                $unwind: "$category"
+            },
+            {
+                $group: {
+                    _id: "$category.name",
+                    totalAmount: { $sum: "$amount" },
+                    donationCount: { $sum: 1 }
+                }
+            },
+            {
+                $project: {
+                    name: "$_id",
+                    totalAmount: 1,
+                    donationCount: 1,
+                    _id: 0
+                }
+            },
+            {
+                $sort: { totalAmount: -1 }
+            }
+        ]);
+
+        const analyticsData = {
+            users: {
+                total: totalUsers,
+                donors: totalDonors,
+                fundraisers: totalFundraisers
+            },
+            causes: {
+                total: totalCauses,
+                active: activeCauses,
+                completed: completedCauses,
+                pending: pendingCauses
+            },
+            donations: {
+                total: totalDonations,
+                amount: totalAmount
+            },
+            categoryDistribution,
+            categoryDonations
+        };
+
+        // Validate the response data
+        const result = validationResult(analyticsData);
+        if (!result.isEmpty()) {
+            return res.status(400).json({ errors: result.array() });
+        }
+
+        res.json(analyticsData);
+    } catch (err) {
+        console.error("Error fetching analytics:", err);
+        res.status(500).json({
+            message: "Failed to fetch analytics data",
+            error: err.message
+        });
     }
 };
 

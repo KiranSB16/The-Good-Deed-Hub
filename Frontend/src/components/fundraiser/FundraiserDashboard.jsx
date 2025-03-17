@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import axios from '@/lib/axios';
 import { Pencil, Trash2, Clock } from "lucide-react";
 import { toast } from 'react-hot-toast';
-import { Badge } from "@/components/ui/badge";
+import Badge from "@/components/ui/badge";
 
 const FundraiserDashboard = () => {
   const { user } = useSelector((state) => state.user);
@@ -241,9 +241,9 @@ const CauseCard = ({ cause, onEdit, onDelete, status }) => {
         <div>
           <div className="flex justify-between text-sm mb-1">
             <span>Progress</span>
-            <span>{Math.round(progress)}%</span>
+            <span>{Math.round(((cause.currentAmount || 0) / (cause.goalAmount || 1)) * 100)}%</span>
           </div>
-          <Progress value={progress} className="h-2" />
+          <Progress value={((cause.currentAmount || 0) / (cause.goalAmount || 1)) * 100} className="h-2" />
           <div className="flex justify-between mt-1 text-sm font-medium">
             <span>Current: ₹{Number(cause.currentAmount || 0).toLocaleString()}</span>
             <span>Goal: ₹{Number(cause.goalAmount || 0).toLocaleString()}</span>

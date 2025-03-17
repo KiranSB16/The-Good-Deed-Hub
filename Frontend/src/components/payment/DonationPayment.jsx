@@ -1,225 +1,139 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { loadStripe } from '@stripe/stripe-js';
-import {
-  Elements,
-  PaymentElement,
-  useStripe,
-  useElements,
-} from '@stripe/react-stripe-js';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'react-hot-toast';
 import axios from '@/lib/axios';
 import { Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { VisuallyHidden } from '@/components/ui/visually-hidden';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 
-// Initialize Stripe with error handling
-const getStripe = async () => {
-  if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
-    console.error('Stripe public key is missing');
-    return null;
-  }
-  try {
-    return await loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
-  } catch (error) {
-    console.error('Error loading Stripe:', error);
-    return null;
-  }
-};
-
-const stripePromise = getStripe();
-
-const PaymentForm = ({ amount, causeId, cause, onSuccess }) => {
-  const stripe = useStripe();
-  const elements = useElements();
+const DonationPayment = ({ causeId, cause, onSuccess, onCancel, initialAmount }) => {
+  const [amount] = useState(initialAmount);
   const [message, setMessage] = useState('');
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [platformFee] = useState(Math.round(initialAmount * 0.05));
+  const [actualDonationAmount] = useState(initialAmount - Math.round(initialAmount * 0.05));
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!stripe || !elements) {
-      toast.error('Payment system is not ready. Please try again.');
-      return;
-    }
-
-    setIsProcessing(true);
-
+  const handleDonate = async () => {
     try {
-      const { error, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: `${window.location.origin}/payment-success?causeId=${causeId}&amount=${amount}`,
-          payment_method_data: {
-            billing_details: {
-              name: cause?.title || 'Donation',
-            },
-          },
-        },
+      setIsProcessing(true);
+      const loadingToast = toast.loading('Preparing your donation...');
+
+      // Ensure we have a valid cause ID
+      const id = typeof causeId === 'object' ? causeId._id : causeId;
+
+      // Create checkout session
+      const { data } = await axios.post('/payments/create-checkout-session', {
+        amount,
+        causeId: id,
+        isAnonymous,
+        message
       });
 
-      if (error) {
-        toast.error(error.message || 'Payment failed. Please try again.');
-        return;
-      }
-
-      // Payment successful
-      if (paymentIntent && paymentIntent.status === 'succeeded') {
-        try {
-          // Update payment status in backend
-          await axios.post('/api/payments/payment-success', {
-            paymentIntentId: paymentIntent.id,
-            causeId,
-            amount,
-            message,
-          });
-
-          // Update cause amount
-          await axios.post(`/api/causes/${causeId}/donate`, {
-            amount: parseFloat(amount),
-            transactionId: paymentIntent.id
-          });
-
-          onSuccess();
-          navigate('/payment-success', {
-            state: {
-              causeId,
-              amount,
-              transactionId: paymentIntent.id
-            }
-          });
-        } catch (error) {
-          console.error('Error updating payment status:', error);
-          toast.error('Payment successful but failed to update status. Please contact support.');
-        }
-      }
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
     } catch (error) {
-      console.error('Payment error:', error);
-      toast.error('Payment failed. Please try again.');
-      navigate('/payment-failed');
+      console.error('Error creating checkout session:', error);
+      toast.error(error.response?.data?.message || 'Could not process donation. Please try again.');
     } finally {
       setIsProcessing(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <DialogTitle>Complete Your Donation</DialogTitle>
-      
-      <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-        <h3 className="font-semibold mb-2">{cause?.title}</h3>
-        <p className="text-sm text-gray-600 mb-2">{cause?.description}</p>
-        <div className="text-primary font-semibold">
-          Amount: ₹{amount.toLocaleString('en-IN')}
+    <div className="w-full max-w-xl mx-auto">
+      <div className="bg-white rounded-lg shadow-sm">
+        <div className="p-6 space-y-6">
+          <div className="text-center">
+            <DialogTitle className="text-xl font-semibold mb-2">Complete Your Donation</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              You're making a difference in someone's life
+            </DialogDescription>
+          </div>
+          
+          <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+            <h3 className="font-semibold text-lg">{cause?.title}</h3>
+            <p className="text-sm text-gray-600">{cause?.description}</p>
+            
+            <div className="space-y-2 pt-2 border-t border-gray-200">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Your Donation:</span>
+                <span className="font-medium">₹{amount.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <div className="flex items-center">
+                  <span className="text-gray-600">Platform Fee (5%)</span>
+                  <span className="ml-1 text-xs text-gray-500 cursor-help" title="This helps us maintain the platform and support more causes">ⓘ</span>
+                </div>
+                <span className="font-medium text-gray-600">₹{platformFee.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between text-sm font-semibold pt-2 border-t border-gray-200">
+                <div className="flex items-center">
+                  <span>Amount to Cause</span>
+                  <span className="ml-1 text-xs text-green-600">✓</span>
+                </div>
+                <span className="text-primary">₹{actualDonationAmount.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="message">Message (Optional)</Label>
+                <Textarea
+                  id="message"
+                  placeholder="Leave a message of support..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  className="min-h-[80px]"
+                />
+              </div>
+              
+              <div className="flex items-center space-x-2 bg-gray-50 p-3 rounded-lg">
+                <Checkbox
+                  id="anonymous"
+                  checked={isAnonymous}
+                  onCheckedChange={setIsAnonymous}
+                />
+                <Label htmlFor="anonymous" className="text-sm">
+                  Make this donation anonymous
+                </Label>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Button
+                onClick={handleDonate}
+                disabled={isProcessing}
+                className="w-full py-6"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    Processing...
+                  </>
+                ) : (
+                  `Proceed to Pay ₹${amount.toLocaleString('en-IN')}`
+                )}
+              </Button>
+              
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                className="w-full"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
-
-      <PaymentElement />
-      
-      <Textarea
-        placeholder="Leave a message (optional)"
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        className="mt-4"
-      />
-
-      <Button
-        type="submit"
-        disabled={isProcessing || !stripe}
-        className="w-full"
-      >
-        {isProcessing ? (
-          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-        ) : (
-          'Complete Donation'
-        )}
-      </Button>
-    </form>
-  );
-};
-
-const DonationPayment = ({ amount, causeId, cause, onSuccess, onCancel }) => {
-  const [clientSecret, setClientSecret] = useState(null);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const createPaymentIntent = async () => {
-      try {
-        const { data } = await axios.post('/api/payments/create-payment-intent', {
-          amount,
-          causeId,
-        });
-        setClientSecret(data.clientSecret);
-      } catch (error) {
-        console.error('Error creating payment intent:', error);
-        setError(error.response?.data?.message || 'Could not initialize payment. Please try again.');
-        onCancel();
-      }
-    };
-
-    createPaymentIntent();
-  }, [amount, causeId]);
-
-  if (error) {
-    return (
-      <div className="p-6 text-center">
-        <DialogTitle>Error</DialogTitle>
-        <DialogDescription>
-          An error occurred while processing your payment
-        </DialogDescription>
-        <p className="text-red-500 mt-4">{error}</p>
-        <Button onClick={onCancel} className="mt-4">
-          Close
-        </Button>
-      </div>
-    );
-  }
-
-  if (!clientSecret) {
-    return (
-      <div className="flex flex-col justify-center items-center p-8 space-y-4">
-        <DialogTitle>Processing Payment</DialogTitle>
-        <DialogDescription>
-          Please wait while we process your payment request
-        </DialogDescription>
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-md mx-auto p-6 bg-white rounded-lg">
-      <Elements
-        stripe={stripePromise}
-        options={{
-          clientSecret,
-          appearance: {
-            theme: 'stripe',
-          },
-          locale: 'en'
-        }}
-      >
-        <DialogDescription className="text-sm text-gray-500 mb-4">
-          Complete your donation securely using Stripe payment
-        </DialogDescription>
-        <PaymentForm
-          amount={amount}
-          causeId={causeId}
-          cause={cause}
-          onSuccess={onSuccess}
-        />
-      </Elements>
-
-      <Button
-        variant="ghost"
-        className="mt-4 w-full"
-        onClick={onCancel}
-      >
-        Cancel
-      </Button>
     </div>
   );
 };

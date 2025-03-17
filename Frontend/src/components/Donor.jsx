@@ -63,7 +63,7 @@ const Donor = () => {
         <Card className="p-6">
           <h2 className="text-xl font-semibold mb-4">Total Amount Donated</h2>
           <div className="text-4xl font-bold text-primary">
-            ${totalDonationAmount.toLocaleString()}
+            ₹{totalDonationAmount.toLocaleString()}
           </div>
         </Card>
 
@@ -103,7 +103,7 @@ const Donor = () => {
                     </div>
                     <div className="text-right">
                       <div className="font-semibold text-primary">
-                        ${donation.amount.toLocaleString()}
+                        ₹{donation.amount.toLocaleString()}
                       </div>
                       <Button 
                         variant="ghost" 
