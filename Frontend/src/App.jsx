@@ -4,10 +4,8 @@ import Register from "@/components/Register.jsx";
 import Login from "@/components/Login.jsx";
 import ForgotPassword from "@/components/ForgotPassword.jsx";
 import ResetPassword from "@/components/ResetPassword.jsx";
-import FundraiserDashboard from "@/components/FundraiserDashboard.jsx";
-import Donor from "@/components/Donor.jsx";
 import Home from "@/components/Home.jsx";
-import Fundraiser from "@/components/Fundraiser.jsx";
+import Fundraiser from "@/components/fundraiser/Fundraiser.jsx";
 import CauseList from "@/components/CauseList.jsx";
 import CauseDetail from "@/components/CauseDetail.jsx";
 import CreateCause from "@/components/CreateCause.jsx";
@@ -25,12 +23,10 @@ import DonorDashboard from './components/donor/DonorDashboard';
 import DonorProfile from './components/donor/DonorProfile';
 import DonorDonations from './components/donor/DonorDonations';
 import SavedCauses from './components/donor/SavedCauses';
-import FundraiserProfile from './components/FundraiserProfile';
-import FundraiserCauses from './components/FundraiserCauses';
 import EditCause from './components/EditCause';
 import { useSelector, useDispatch } from 'react-redux';
-import PaymentSuccess from '@/pages/PaymentSuccess';
-import PaymentFailed from "@/pages/PaymentFailed";
+import PaymentSuccess from '@/components/payment/PaymentSuccess';
+import PaymentFailed from "@/components/payment/PaymentFailed";
 
 // Protected Route component with role check
 const ProtectedRoute = ({ children, requiredRole }) => {
@@ -131,10 +127,10 @@ const App = () => {
             </ProtectedRoute>
           }
         >
-          <Route index element={<FundraiserDashboard />} />
-          <Route path="profile" element={<FundraiserProfile />} />
-          <Route path="causes" element={<FundraiserCauses />} />
-          <Route path="causes/edit/:id" element={<EditCause />} />
+          <Route index element={<></>} />
+          <Route path="profile" element={<></>} />
+          <Route path="causes" element={<></>} />
+          <Route path="causes/edit/:id" element={<></>} />
         </Route>
       </Routes>
     </ThemeProvider>

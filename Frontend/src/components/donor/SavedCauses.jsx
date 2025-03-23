@@ -153,12 +153,9 @@ export default function SavedCauses() {
       {causes.length === 0 && (
         <div className="text-center py-12">
           <p className="text-lg text-muted-foreground">No saved causes</p>
-          <Button
-            className="mt-4"
-            onClick={() => navigate('/causes')}
-          >
-            Explore Causes
-          </Button>
+          <p className="text-sm text-gray-500 mt-2">
+            You haven't saved any causes yet. Browse the available causes and click the heart icon to save them.
+          </p>
         </div>
       )}
     </div>

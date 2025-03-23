@@ -65,7 +65,8 @@ const DonorProfile = () => {
         bio: formData.bio
       }));
 
-      const response = await axios.put('/donor/profile', formDataObj, {
+      // Remove the leading slash from the endpoint
+      const response = await axios.put('donors/profile', formDataObj, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
@@ -111,7 +112,8 @@ const DonorProfile = () => {
         bio: formData.bio
       }));
 
-      const response = await axios.put('/donor/profile', formDataObj);
+      // Remove the leading slash from the endpoint
+      const response = await axios.put('donors/profile', formDataObj);
       
       // Update both form data and Redux store
       setFormData(prev => ({
@@ -246,4 +248,4 @@ const DonorProfile = () => {
   );
 };
 
-export default DonorProfile; 
+export default DonorProfile;

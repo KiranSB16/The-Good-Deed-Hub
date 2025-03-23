@@ -24,6 +24,9 @@ export default function AdminDashboard() {
   const [sort, setSort] = useState('newest');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(6);
+  const [activeTab, setActiveTab] = useState('active');
+  const [activeCausesCount, setActiveCausesCount] = useState(0);
+  const [completedCausesCount, setCompletedCausesCount] = useState(0);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -51,10 +54,47 @@ export default function AdminDashboard() {
       setLoading(true);
       setError(null);
 
-      // Fetch approved causes
-      const approvedCauses = await axios.get('/causes?status=approved');
-      const approvedCausesArray = Array.isArray(approvedCauses.data.causes) ? approvedCauses.data.causes : [];
-      setActiveCauses(approvedCausesArray);
+      // Make a single call and handle filtering on the client side
+      const causesResponse = await axios.get('/causes', {
+        params: {
+          includeCompleted: true,
+          limit: 50 // Increase limit to ensure we get more causes
+        }
+      })
+        .catch(error => {
+          console.error('Error fetching causes:', error);
+          throw error;
+        });
+      
+      if (!causesResponse || !causesResponse.data) {
+        throw new Error('No data received from the server');
+      }
+      
+      console.log('API Response:', causesResponse.data);
+      
+      // Extract causes array from response
+      const allCauses = causesResponse.data.causes || [];
+      
+      if (!Array.isArray(allCauses)) {
+        console.error('Expected causes to be an array, got:', typeof allCauses);
+        throw new Error('Invalid data format received from the server');
+      }
+      
+      // Set all causes to state
+      setActiveCauses(allCauses);
+      
+      // Log the counts for debugging
+      const pendingCount = allCauses.filter(cause => cause.status === 'pending').length;
+      const approvedCount = allCauses.filter(cause => cause.status === 'approved').length;
+      const completedCount = allCauses.filter(cause => cause.status === 'completed').length;
+      
+      console.log('Fetched causes:', {
+        pending: pendingCount,
+        approved: approvedCount,
+        completed: completedCount,
+        total: allCauses.length
+      });
+      
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       console.error('Error details:', {
@@ -70,9 +110,56 @@ export default function AdminDashboard() {
     }
   };
 
-  // Filter and sort active causes
+  // Get counts for active and completed causes
+  const fetchCauseCounts = async () => {
+    try {
+      // Fetch active causes count
+      const activeResult = await axios.get('/causes/count', {
+        params: {
+          status: 'approved',
+          search,
+          category: category === 'all' ? undefined : category
+        }
+      });
+      
+      // Fetch completed causes count
+      const completedResult = await axios.get('/causes/count', {
+        params: {
+          status: 'completed',
+          search,
+          category: category === 'all' ? undefined : category
+        }
+      });
+      
+      return {
+        activeCount: activeResult.data.count || 0,
+        completedCount: completedResult.data.count || 0
+      };
+    } catch (error) {
+      console.error('Error fetching cause counts:', error);
+      return { activeCount: 0, completedCount: 0 };
+    }
+  };
+
+  // Fetch counts when filters change
+  useEffect(() => {
+    const getCounts = async () => {
+      const counts = await fetchCauseCounts();
+      setActiveCausesCount(counts.activeCount);
+      setCompletedCausesCount(counts.completedCount);
+    };
+    
+    getCounts();
+  }, [search, category]);
+
+  // Filter causes based on status
   const getFilteredAndSortedCauses = () => {
     let filteredCauses = [...activeCauses];
+
+    // First filter by status based on active tab
+    filteredCauses = filteredCauses.filter(cause => 
+      activeTab === 'active' ? cause.status === 'approved' : cause.status === 'completed'
+    );
 
     // Apply search filter
     if (search) {
@@ -175,14 +262,14 @@ export default function AdminDashboard() {
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-500 dark:text-gray-400">Status</span>
-            <span className="font-medium text-green-600 dark:text-green-400">
-              Active
+            <span className={`font-medium ${cause.status === 'completed' ? 'text-blue-600 dark:text-blue-400' : cause.status === 'pending' ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400'}`}>
+              {cause.status === 'completed' ? 'Completed' : cause.status === 'pending' ? 'Pending' : 'Active'}
             </span>
           </div>
         </div>
         <div className="mt-4 flex justify-between items-center">
           <div className="text-sm text-gray-500 dark:text-gray-400">
-            Ends: {new Date(cause.endDate).toLocaleDateString()}
+            {cause.status === 'completed' ? 'Ended' : 'Ends'}: {new Date(cause.endDate).toLocaleDateString()}
           </div>
           <div className="flex gap-2">
             {cause.documents?.length > 0 && (
@@ -239,12 +326,31 @@ export default function AdminDashboard() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
         </div>
 
-        {/* Active Causes Section */}
+        {/* Tabs for Active/Completed Causes */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Active Causes
-            </h2>
+          <div className="border-b border-gray-200 mb-6">
+            <div className="flex space-x-8">
+              <button
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'active'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+                onClick={() => setActiveTab('active')}
+              >
+                Active Causes ({activeCausesCount})
+              </button>
+              <button
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'completed'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+                onClick={() => setActiveTab('completed')}
+              >
+                Completed Causes ({completedCausesCount})
+              </button>
+            </div>
           </div>
 
           {/* Search and Filter Section */}
@@ -282,65 +388,59 @@ export default function AdminDashboard() {
                   <SelectContent>
                     <SelectItem value="newest">Newest First</SelectItem>
                     <SelectItem value="oldest">Oldest First</SelectItem>
-                    <SelectItem value="highest">Highest Amount</SelectItem>
-                    <SelectItem value="lowest">Lowest Amount</SelectItem>
+                    <SelectItem value="highest">Highest Goal</SelectItem>
+                    <SelectItem value="lowest">Lowest Goal</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
           </div>
-          
+
+          {/* Causes Grid */}
           {paginatedCauses.length > 0 ? (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {paginatedCauses.map((cause) => (
-                  <CauseCard key={cause._id} cause={cause} />
-                ))}
-              </div>
-              
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex justify-center items-center gap-4 mt-8">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <div className="flex items-center gap-2">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <Button
-                        key={page}
-                        variant={currentPage === page ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => handlePageChange(page)}
-                      >
-                        {page}
-                      </Button>
-                    ))}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-            </>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {paginatedCauses.map((cause) => (
+                <CauseCard key={cause._id} cause={cause} />
+              ))}
+            </div>
           ) : (
             <div className="text-center py-12">
-              <p className="text-gray-500 dark:text-gray-400 text-lg">
-                No active causes found matching your criteria.
+              <p className="text-gray-500 dark:text-gray-400">
+                {activeTab === 'active' 
+                  ? 'No active causes found matching your criteria.' 
+                  : 'No completed causes found matching your criteria.'}
               </p>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-center mt-8">
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="flex items-center"
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+                </Button>
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center"
+                >
+                  Next <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
             </div>
           )}
         </div>
       </div>
     </div>
   );
-} 
+}

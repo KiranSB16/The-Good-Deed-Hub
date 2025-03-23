@@ -6,16 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import axios from '@/lib/axios';
-import { Pencil, Trash2, Clock } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { toast } from 'react-hot-toast';
-import Badge from "@/components/ui/badge";
 
 const FundraiserDashboard = () => {
   const { user } = useSelector((state) => state.user);
   const navigate = useNavigate();
   const [approvedCauses, setApprovedCauses] = useState([]);
-  const [pendingCauses, setPendingCauses] = useState([]);
-  const [rejectedCauses, setRejectedCauses] = useState([]);
+  const [completedCauses, setCompletedCauses] = useState([]);
   const [stats, setStats] = useState({
     totalRaised: 0
   });
@@ -29,35 +27,36 @@ const FundraiserDashboard = () => {
         setError(null);
         const response = await axios.get('/causes');
         
-        console.log('Raw causes data:', response.data);
+        // Check if response.data is an array or an object with a causes property
+        const causesArray = Array.isArray(response.data) ? response.data : response.data.causes;
         
-        // Filter causes by status
-        const userCauses = response.data.filter(cause => cause.fundraiserId?._id === user._id);
-        console.log('User causes:', userCauses);
-
-        // Log each cause's status
-        userCauses.forEach(cause => {
-          console.log(`Cause ${cause._id} status:`, cause.status);
-        });
-
-        const approved = userCauses.filter(cause => cause.status === 'approved');
-        const pending = userCauses.filter(cause => cause.status === 'pending');
-        const rejected = userCauses.filter(cause => cause.status === 'rejected');
+        if (!Array.isArray(causesArray)) {
+          console.error('Unexpected response format:', response.data);
+          setError('Invalid data format received from server');
+          return;
+        }
         
-        console.log('Filtered causes:', {
-          approved: approved.length,
-          pending: pending.length,
-          rejected: rejected.length,
-          pendingCauses: pending
+        // Filter for user's causes
+        const userCauses = causesArray.filter(cause => {
+          const causeFundraiserId = cause.fundraiserId?._id || cause.fundraiserId;
+          return causeFundraiserId === user._id;
         });
         
-        // Set causes by status
-        setApprovedCauses(approved);
-        setPendingCauses(pending);
-        setRejectedCauses(rejected);
+        // Filter active and completed causes
+        const activeCauses = userCauses.filter(cause => 
+          cause.status?.toLowerCase() === 'approved' && cause.status?.toLowerCase() !== 'completed'
+        );
+        
+        const finishedCauses = userCauses.filter(cause => 
+          cause.status?.toLowerCase() === 'completed'
+        );
+        
+        // Set causes
+        setApprovedCauses(activeCauses);
+        setCompletedCauses(finishedCauses);
 
-        // Calculate total amount raised from approved causes
-        const totalRaised = approved.reduce((sum, cause) => sum + (cause.currentAmount || 0), 0);
+        // Calculate total amount raised from all causes (active and completed)
+        const totalRaised = userCauses.reduce((sum, cause) => sum + (cause.currentAmount || 0), 0);
         setStats({ totalRaised });
       } catch (error) {
         console.error('Error fetching causes:', error);
@@ -73,38 +72,19 @@ const FundraiserDashboard = () => {
   }, [user]);
 
   const handleEdit = (causeId) => {
-    navigate(`/fundraiser/causes/edit/${causeId}`);
+    navigate(`/edit-cause/${causeId}`);
   };
 
   const handleDelete = async (causeId) => {
     try {
       await axios.delete(`/causes/${causeId}`);
-      // Remove the deleted cause from all lists
-      setApprovedCauses(prev => prev.filter(cause => cause._id !== causeId));
-      setPendingCauses(prev => prev.filter(cause => cause._id !== causeId));
-      setRejectedCauses(prev => prev.filter(cause => cause._id !== causeId));
+      setApprovedCauses(approvedCauses.filter(cause => cause._id !== causeId));
       toast.success('Cause deleted successfully');
     } catch (error) {
       console.error('Error deleting cause:', error);
       toast.error(error.response?.data?.message || 'Failed to delete cause');
     }
   };
-
-  if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <p className="text-center">Loading...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <p className="text-center text-red-600">{error}</p>
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -122,59 +102,37 @@ const FundraiserDashboard = () => {
         </Card>
       </div>
 
-      {/* Pending Causes */}
-      {pendingCauses.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">Pending Approval</h2>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {pendingCauses.map((cause) => (
-              <CauseCard 
-                key={cause._id} 
-                cause={cause} 
-                onEdit={handleEdit} 
-                onDelete={handleDelete}
-                status="pending"
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Approved Causes */}
-      <div className="mb-8">
+      {/* Approved Causes List */}
+      <div className="mb-12">
         <h2 className="text-2xl font-semibold mb-4">Active Fundraising Campaigns</h2>
-        {approvedCauses.length === 0 ? (
+        {loading ? (
+          <Card className="p-6">
+            <p className="text-center">Loading causes...</p>
+          </Card>
+        ) : error ? (
+          <Card className="p-6">
+            <p className="text-center text-red-600">{error}</p>
+          </Card>
+        ) : approvedCauses.length === 0 ? (
           <Card className="p-6">
             <p className="text-center text-muted-foreground">No active causes found. Create a new cause to get started!</p>
           </Card>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {approvedCauses.map((cause) => (
-              <CauseCard 
-                key={cause._id} 
-                cause={cause} 
-                onEdit={handleEdit} 
-                onDelete={handleDelete}
-                status="approved"
-              />
+              <CauseCard key={cause._id} cause={cause} />
             ))}
           </div>
         )}
       </div>
-
-      {/* Rejected Causes */}
-      {rejectedCauses.length > 0 && (
+      
+      {/* Completed Causes List */}
+      {!loading && completedCauses.length > 0 && (
         <div>
-          <h2 className="text-2xl font-semibold mb-4">Rejected Causes</h2>
+          <h2 className="text-2xl font-semibold mb-4">Completed Campaigns</h2>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {rejectedCauses.map((cause) => (
-              <CauseCard 
-                key={cause._id} 
-                cause={cause} 
-                onEdit={handleEdit} 
-                onDelete={handleDelete}
-                status="rejected"
-              />
+            {completedCauses.map((cause) => (
+              <CauseCard key={cause._id} cause={cause} isCompleted={true} />
             ))}
           </div>
         </div>
@@ -183,28 +141,43 @@ const FundraiserDashboard = () => {
   );
 };
 
-const CauseCard = ({ cause, onEdit, onDelete, status }) => {
+const CauseCard = ({ cause, isCompleted = false }) => {
+  const { user } = useSelector((state) => state.user);
+  const navigate = useNavigate();
+  
   if (!cause) return null;
+
+  const causeFundraiserId = cause.fundraiserId?._id || cause.fundraiserId;
+  const isOwner = user?._id === causeFundraiserId;
+
+  const handleEdit = () => {
+    navigate(`/fundraiser/causes/edit/${cause._id}`);
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete this cause?')) {
+      return;
+    }
+    try {
+      await axios.delete(`causes/${cause._id}`);
+      toast.success('Cause deleted successfully');
+      window.location.reload();
+    } catch (error) {
+      console.error('Error deleting cause:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete cause');
+    }
+  };
+
+  const handleViewDetails = () => {
+    navigate(`/causes/${cause._id}`);
+  };
 
   const progress = cause.goalAmount > 0 
     ? (cause.currentAmount / cause.goalAmount) * 100 
     : 0;
 
-  const getStatusBadge = () => {
-    switch (status) {
-      case 'pending':
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-600 border-yellow-200">Pending Approval</Badge>;
-      case 'rejected':
-        return <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200">Rejected</Badge>;
-      case 'approved':
-        return <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">Active</Badge>;
-      default:
-        return null;
-    }
-  };
-
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden group">
       <div className="relative">
         <img 
           src={cause.images?.[0] || '/placeholder-image.jpg'} 
@@ -212,51 +185,70 @@ const CauseCard = ({ cause, onEdit, onDelete, status }) => {
           className="w-full h-48 object-cover"
         />
         <div className="absolute top-2 right-2 flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="bg-white hover:bg-gray-100"
-            onClick={() => onEdit(cause._id)}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            className="bg-red-500 hover:bg-red-600 text-white"
-            onClick={() => onDelete(cause._id)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <span className={`px-2 py-1 rounded-full text-xs font-medium 
+            ${isCompleted 
+              ? 'bg-blue-100 text-blue-800' 
+              : 'bg-green-100 text-green-800'}`}>
+            {isCompleted ? 'Completed' : 'Approved'}
+          </span>
         </div>
+        {!isCompleted && (
+          <div className="absolute bottom-2 right-2 flex gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-white hover:bg-gray-100 text-gray-800"
+              onClick={handleEdit}
+            >
+              <Pencil className="h-4 w-4 mr-1" />
+              Edit
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="bg-red-500 hover:bg-red-600 text-white"
+              onClick={handleDelete}
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
+            </Button>
+          </div>
+        )}
       </div>
       <CardHeader>
-        <div className="flex justify-between items-start">
-          <CardTitle className="truncate">{cause.title}</CardTitle>
-          {getStatusBadge()}
-        </div>
+        <CardTitle className="truncate">{cause.title}</CardTitle>
         <CardDescription className="line-clamp-2">{cause.description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
           <div className="flex justify-between text-sm mb-1">
             <span>Progress</span>
-            <span>{Math.round(((cause.currentAmount || 0) / (cause.goalAmount || 1)) * 100)}%</span>
+            <span>{Math.round(progress)}%</span>
           </div>
-          <Progress value={((cause.currentAmount || 0) / (cause.goalAmount || 1)) * 100} className="h-2" />
+          <Progress value={progress} className="h-2" />
           <div className="flex justify-between mt-1 text-sm font-medium">
             <span>Current: ₹{Number(cause.currentAmount || 0).toLocaleString()}</span>
             <span>Goal: ₹{Number(cause.goalAmount || 0).toLocaleString()}</span>
           </div>
         </div>
+        
+        {isCompleted && (
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-2 text-sm text-blue-800">
+            <p className="font-semibold">🎉 Goal Reached!</p>
+            <p>This cause has been fully funded. Thank you for your successful campaign!</p>
+          </div>
+        )}
+        
         <div className="text-sm text-muted-foreground">
           Created {formatDistanceToNow(new Date(cause.createdAt || Date.now()), { addSuffix: true })}
         </div>
-        {cause.rejectionReason && (
-          <div className="mt-2 text-sm text-red-600">
-            Rejection reason: {cause.rejectionReason}
-          </div>
-        )}
+        <Button 
+          variant="outline" 
+          className="w-full"
+          onClick={handleViewDetails}
+        >
+          View Details
+        </Button>
       </CardContent>
     </Card>
   );

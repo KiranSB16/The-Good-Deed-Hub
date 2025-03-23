@@ -29,4 +29,12 @@ router.get(
     donationCltr.getRecommendedCauses
 );
 
+// Get donations by cause ID - Accessible to all authenticated users
+router.get(
+    '/by-cause/:causeId',
+    AuthenticateUser,
+    authorizeUser(['donor', 'fundraiser', 'admin']),
+    donationCltr.getByCause
+);
+
 export default router;

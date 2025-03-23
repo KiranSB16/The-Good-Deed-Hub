@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { toast } from 'react-hot-toast';
 import axios from '@/lib/axios';
+import { Loader2 } from 'lucide-react';
 
 export default function AdminCauseDetails() {
   const { id } = useParams();
@@ -11,6 +12,9 @@ export default function AdminCauseDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [donations, setDonations] = useState([]);
+  const [loadingDonations, setLoadingDonations] = useState(false);
+  const [showDonations, setShowDonations] = useState(false);
 
   useEffect(() => {
     fetchCauseDetails();
@@ -28,6 +32,24 @@ export default function AdminCauseDetails() {
       setError(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDonations = async () => {
+    if (!showDonations) {
+      setShowDonations(true);
+      try {
+        setLoadingDonations(true);
+        const response = await axios.get(`/donations/by-cause/${id}`);
+        setDonations(response.data || []);
+      } catch (error) {
+        console.error('Error fetching donations:', error);
+        toast.error('Failed to load donations');
+      } finally {
+        setLoadingDonations(false);
+      }
+    } else {
+      setShowDonations(false);
     }
   };
 
@@ -90,7 +112,11 @@ export default function AdminCauseDetails() {
                 <span className="bg-blue-500/20 backdrop-blur-sm px-3 py-1 rounded-full">
                   {cause.category?.name || 'General'}
                 </span>
-                <span className="bg-green-500/20 backdrop-blur-sm px-3 py-1 rounded-full">
+                <span className={`backdrop-blur-sm px-3 py-1 rounded-full ${
+                  cause.status === 'approved' ? 'bg-green-500/20' : 
+                  cause.status === 'completed' ? 'bg-blue-500/20' : 
+                  cause.status === 'rejected' ? 'bg-red-500/20' : 'bg-yellow-500/20'
+                }`}>
                   {cause.status}
                 </span>
               </div>
@@ -129,6 +155,10 @@ export default function AdminCauseDetails() {
                     <dd className="font-medium text-gray-900 dark:text-white">₹{cause.goalAmount?.toLocaleString()}</dd>
                   </div>
                   <div className="flex justify-between">
+                    <dt className="text-gray-500 dark:text-gray-400">Raised Amount</dt>
+                    <dd className="font-medium text-gray-900 dark:text-white">₹{cause.currentAmount?.toLocaleString()}</dd>
+                  </div>
+                  <div className="flex justify-between">
                     <dt className="text-gray-500 dark:text-gray-400">Duration</dt>
                     <dd className="font-medium text-gray-900 dark:text-white">
                       {new Date(cause.startDate).toLocaleDateString()} - {new Date(cause.endDate).toLocaleDateString()}
@@ -136,6 +166,58 @@ export default function AdminCauseDetails() {
                   </div>
                 </dl>
               </div>
+            </div>
+
+            {/* Donations Section */}
+            <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Donations</h3>
+                <Button 
+                  variant="outline"
+                  onClick={fetchDonations}
+                  className="text-sm"
+                >
+                  {showDonations ? 'Hide Donations' : 'View Donations'}
+                </Button>
+              </div>
+
+              {showDonations && (
+                <div className="space-y-4 mt-2">
+                  {loadingDonations ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                  ) : donations.length === 0 ? (
+                    <p className="text-center text-gray-500 dark:text-gray-400 py-2">No donations yet</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {donations.map((donation, index) => (
+                        <div key={donation._id || index} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                          <div className="flex justify-between">
+                            <div>
+                              <span className="font-medium text-gray-900 dark:text-white">
+                                {donation.isAnonymous ? 'Anonymous Donor' : donation.donorId?.name || 'Donor'}
+                              </span>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                {new Date(donation.createdAt).toLocaleDateString()} • 
+                                {new Date(donation.createdAt).toLocaleTimeString()}
+                              </p>
+                            </div>
+                            <div className="text-blue-600 dark:text-blue-400 font-semibold">
+                              ₹{donation.amount.toLocaleString('en-IN')}
+                            </div>
+                          </div>
+                          {donation.message && (
+                            <p className="mt-2 text-sm italic text-gray-600 dark:text-gray-300">
+                              "{donation.message}"
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Supporting Images */}

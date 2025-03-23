@@ -163,7 +163,7 @@ donorCltr.getProfile = async (req, res) => {
 // Get saved causes
 donorCltr.getSavedCauses = async (req, res) => {
     try {
-        // Find or create donor profile
+        // Find donor profile
         let donor = await Donor.findOne({ userId: req.user.userId })
             .populate({
                 path: 'savedCauses',
@@ -182,8 +182,15 @@ donorCltr.getSavedCauses = async (req, res) => {
 
         // If donor profile doesn't exist, create one
         if (!donor) {
+            // Get user details to include email
+            const user = await User.findById(req.user.userId);
+            if (!user) {
+                return res.status(404).json({ message: 'User not found' });
+            }
+            
             const newDonor = new Donor({
                 userId: req.user.userId,
+                email: user.email, // Include email from user model
                 savedCauses: []
             });
             await newDonor.save();
@@ -265,8 +272,15 @@ donorCltr.getDonations = async (req, res) => {
         // Find or create donor profile
         let donor = await Donor.findOne({ userId: req.user.userId });
         if (!donor) {
+            // Get user details to include email
+            const user = await User.findById(req.user.userId);
+            if (!user) {
+                return res.status(404).json({ message: 'User not found' });
+            }
+            
             donor = new Donor({
                 userId: req.user.userId,
+                email: user.email, // Include email from user model
                 savedCauses: []
             });
             await donor.save();
@@ -320,69 +334,90 @@ donorCltr.getDonationsByCause = async (req, res) => {
     try {
         const { causeId } = req.params;
 
-        const donations = await Donation.find({
-            donorId: req.user._id,
-            causeId: causeId
-        })
-        .populate({
-            path: 'causeId',
-            populate: [
-                { path: 'category', select: 'name' },
-                { path: 'fundraiserId', select: 'name email' }
-            ]
-        })
-        .sort({ createdAt: -1 });
-
-        const totalDonated = donations.reduce((sum, donation) => sum + donation.amount, 0);
-
-        res.json({
-            donations,
-            stats: {
-                totalDonations: donations.length,
-                totalAmountDonated: totalDonated
+        // Find donor profile
+        let donor = await Donor.findOne({ userId: req.user.userId });
+        if (!donor) {
+            // Get user details to include email
+            const user = await User.findById(req.user.userId);
+            if (!user) {
+                return res.status(404).json({ message: 'User not found' });
             }
-        });
+            
+            donor = new Donor({
+                userId: req.user.userId,
+                email: user.email, // Include email from user model
+                savedCauses: []
+            });
+            await donor.save();
+        }
+
+        // Find donations for the specific cause
+        const donations = await Donation.find({ 
+            donorId: donor._id,
+            causeId
+        })
+        .sort({ createdAt: -1 })
+        .lean();
+
+        res.json(donations);
     } catch (error) {
-        console.error('Error fetching donations for cause:', error);
-        res.status(500).json({ message: 'Failed to fetch donations for this cause' });
+        console.error('Error fetching donations by cause:', error);
+        res.status(500).json({ 
+            message: 'Failed to fetch donations for this cause',
+            error: error.message
+        });
     }
 };
 
 // Create donation
 donorCltr.createDonation = async (req, res) => {
     try {
-        const { causeId, amount, message } = req.body;
+        const { causeId, amount, paymentMethod, transactionId } = req.body;
 
-        const cause = await Cause.findById(causeId);
-        if (!cause) {
-            return res.status(404).json({ message: 'Cause not found' });
+        // Find or create donor profile
+        let donor = await Donor.findOne({ userId: req.user.userId });
+        if (!donor) {
+            // Get user details to include email
+            const user = await User.findById(req.user.userId);
+            if (!user) {
+                return res.status(404).json({ message: 'User not found' });
+            }
+            
+            donor = new Donor({
+                userId: req.user.userId,
+                email: user.email, // Include email from user model
+                savedCauses: []
+            });
+            await donor.save();
         }
 
-        if (cause.status !== 'approved') {
-            return res.status(400).json({ message: 'Cannot donate to unapproved cause' });
-        }
-
-        const donation = new Donation({
-            donorId: req.user.userId,
+        // Create new donation
+        const newDonation = new Donation({
+            donorId: donor._id,
             causeId,
             amount,
-            message,
-            status: 'pending'
+            paymentMethod,
+            transactionId,
+            status: 'completed' // Assuming payment is already processed
         });
 
-        await donation.save();
+        await newDonation.save();
 
-        // Update cause amount (you might want to do this after payment confirmation)
-        cause.currentAmount += amount;
-        await cause.save();
+        // Update cause's raised amount
+        await Cause.findByIdAndUpdate(causeId, {
+            $inc: { raisedAmount: amount }
+        });
 
-        res.status(201).json({
-            message: 'Donation created successfully',
-            donation
+        res.status(201).json({ 
+            message: 'Donation created successfully', 
+            donation: newDonation 
         });
     } catch (error) {
         console.error('Error creating donation:', error);
-        res.status(500).json({ message: 'Failed to create donation' });
+        res.status(500).json({ 
+            message: 'Failed to create donation',
+            error: error.message
+        });
     }
 };
 
@@ -406,4 +441,3 @@ donorCltr.getStats = async (req, res) => {
 };
 
 export default donorCltr
-

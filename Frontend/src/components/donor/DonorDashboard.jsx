@@ -41,11 +41,18 @@ const DonorDashboard = () => {
   const location = useLocation();
 
   // Pagination and filter states
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('all');
   const [sort, setSort] = useState('newest');
+  const [activePage, setActivePage] = useState(1);
+  const [activeTotalPages, setActiveTotalPages] = useState(1);
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState('active');
+
+  // State for counts
+  const [activeCausesCount, setActiveCausesCount] = useState(0);
+  const [completedCausesCount, setCompletedCausesCount] = useState(0);
 
   // Fetch categories
   useEffect(() => {
@@ -65,27 +72,81 @@ const DonorDashboard = () => {
   const refreshCauses = async () => {
     try {
       setLoading(true);
+      
+      // Only fetch active causes by default
       const result = await dispatch(fetchCauses({ 
-        page, 
+        page: activePage, 
         search, 
         category: category === 'all' ? undefined : category,
-        sort 
+        sort,
+        status: activeTab === 'active' ? 'approved' : 'completed'
       })).unwrap();
       
       if (result) {
-        setTotalPages(result.totalPages);
+        setActiveTotalPages(result.totalPages || 1);
       }
       
-      if (user) {
-        await fetchSavedCauses();
-      }
+      // Always fetch saved causes to make sure we're in sync
+      await fetchSavedCauses();
+      
+      console.log('Fetched causes:', result);
+      
     } catch (error) {
       console.error('Error refreshing data:', error);
+      
+      // Detailed error logging
+      if (error.response) {
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
+      }
+      
       toast.error('Failed to fetch causes');
     } finally {
       setLoading(false);
     }
   };
+
+  // Get counts for active causes
+  const fetchCauseCounts = async () => {
+    try {
+      // Fetch active causes count
+      const activeResult = await axios.get('/causes/count', {
+        params: {
+          status: 'approved',
+          search,
+          category: category === 'all' ? undefined : category
+        }
+      });
+      
+      // Fetch completed causes count
+      const completedResult = await axios.get('/causes/count', {
+        params: {
+          status: 'completed',
+          search,
+          category: category === 'all' ? undefined : category
+        }
+      });
+      
+      return {
+        activeCount: activeResult.data.count || 0,
+        completedCount: completedResult.data.count || 0,
+      };
+    } catch (error) {
+      console.error('Error fetching cause counts:', error);
+      return { activeCount: 0, completedCount: 0 };
+    }
+  };
+
+  // Fetch counts when filters change
+  useEffect(() => {
+    const getCounts = async () => {
+      const counts = await fetchCauseCounts();
+      setActiveCausesCount(counts.activeCount);
+      setCompletedCausesCount(counts.completedCount);
+    };
+    
+    getCounts();
+  }, [search, category]);
 
   // Initial load and when filters change
   useEffect(() => {
@@ -94,84 +155,135 @@ const DonorDashboard = () => {
     }, search ? 500 : 0); // Only debounce search, not other filters
 
     return () => clearTimeout(timer);
-  }, [search, category, sort, page]);
+  }, [search, category, sort, activePage, activeTab]);
 
-  // Handle payment success refresh
+  // Add a separate effect to detect user login changes
   useEffect(() => {
-    if (location.state?.fromPayment) {
-      refreshCauses();
+    if (user && user._id) {
+      fetchSavedCauses();
+    } else {
+      setSavedCauses([]);
     }
-  }, [location.state]);
+  }, [user]);
 
   const fetchSavedCauses = async () => {
+    if (!user || !user._id) {
+      setSavedCauses([]);
+      return;
+    }
+    
     try {
-      const response = await axios.get('/donors/saved-causes');
-      if (response.data.savedCauses) {
-        setSavedCauses(response.data.savedCauses.map(cause => cause._id));
+      // Add authentication header explicitly
+      const response = await axios.get('/donors/saved-causes', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}` // Make sure token is being stored
+        }
+      });
+      
+      if (response.data && Array.isArray(response.data.savedCauses)) {
+        setSavedCauses(response.data.savedCauses.map(cause => 
+          // Handle both direct IDs and object references
+          typeof cause === 'string' ? cause : cause._id || cause.id
+        ));
+        console.log('Saved causes loaded:', response.data.savedCauses);
       } else {
-        console.warn('No saved causes data received:', response.data);
+        console.warn('No saved causes data received or invalid format:', response.data);
         setSavedCauses([]);
       }
     } catch (error) {
       console.error('Error fetching saved causes:', error);
-      setSavedCauses([]);
-      if (error.response) {
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
+      
+      // Check if it's an authentication error
+      if (error.response && error.response.status === 401) {
+        console.error('Authentication error when fetching saved causes. Token may be invalid.');
+        // Option to redirect to login here if needed
+        // navigate('/login');
       }
-      toast.error('Failed to fetch saved causes');
+      
+      setSavedCauses([]);
     }
   };
 
-  const handleSaveCause = async (causeId) => {
-    if (!user) {
-      navigate('/login');
-      return;
+  const handleSaveCause = async (causeId, event) => {
+    // Stop propagation to prevent navigation when clicking the save button
+    if (event) {
+      event.stopPropagation(); 
     }
     
     try {
+      // First, explicitly check if user is logged in
+      if (!user || !user._id) {
+        toast.error('Please log in to save causes');
+        navigate('/login');
+        return;
+      }
+      
+      console.log('Attempting to save/unsave cause:', causeId);
+      console.log('Current saved causes:', savedCauses);
+      console.log('User state:', user);
+      
+      // Check if cause is already saved
       if (savedCauses.includes(causeId)) {
-        await axios.delete(`/donors/saved-causes/${causeId}`);
-        setSavedCauses(savedCauses.filter(id => id !== causeId));
+        // Remove from saved causes
+        await axios.delete(`/donors/saved-causes/${causeId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}` 
+          }
+        });
+        
+        // Update state immediately
+        setSavedCauses(prev => prev.filter(id => id !== causeId));
         toast.success('Cause removed from saved list');
       } else {
-        const response = await axios.post('/donors/save-cause', { causeId });
-        console.log('Save cause response:', response.data);
-        setSavedCauses([...savedCauses, causeId]);
+        // Add to saved causes
+        const response = await axios.post('/donors/save-cause', 
+          { causeId }, 
+          {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}` 
+            }
+          }
+        );
+        
+        // Update state immediately
+        setSavedCauses(prev => [...prev, causeId]);
         toast.success('Cause saved successfully');
       }
     } catch (error) {
       console.error('Error saving cause:', error);
+      
+      // Handle specific error cases
       if (error.response) {
-        console.error('Response data:', error.response.data);
-        console.error('Response status:', error.response.status);
+        if (error.response.status === 401) {
+          // Redirect to login if unauthorized
+          toast.error('Your session has expired. Please log in again.');
+          localStorage.removeItem('token'); // Clear invalid token
+          navigate('/login');
+        } else if (error.response.status === 409) {
+          // Handle duplicate save attempts
+          toast.info('This cause is already in your saved list');
+          // Refresh saved causes to sync with server
+          fetchSavedCauses();
+        } else {
+          toast.error(error.response?.data?.message || 'Failed to save cause');
+        }
+      } else {
+        toast.error('Network error while saving cause');
       }
-      toast.error(error.response?.data?.message || 'Failed to save cause');
     }
   };
 
   const handleDonateClick = (causeId) => {
-    if (!user) {
-      navigate('/login', { state: { from: `/causes/${causeId}` } });
-      return;
-    }
+    // Ensure causeId is a string
     const id = typeof causeId === 'object' ? causeId._id : causeId;
+    
+    // Navigate to cause detail page
     navigate(`/causes/${id}`);
   };
 
   const handleViewDetails = async (cause) => {
-    setSelectedCause(cause);
-    setShowDetailsDialog(true);
-    setCurrentImageIndex(0);
-    
-    try {
-      // Fetch donations for this cause
-      const response = await axios.get(`/causes/${cause._id}/donations`);
-      setDonations(response.data);
-    } catch (error) {
-      console.error('Error fetching donations:', error);
-      toast.error('Failed to fetch donation details');
-    }
+    // Navigate to the cause detail page
+    navigate(`/causes/${cause._id}`);
   };
 
   const nextImage = () => {
@@ -192,17 +304,27 @@ const DonorDashboard = () => {
 
   const handleSearch = (e) => {
     setSearch(e.target.value);
-    setPage(1); // Reset to first page when searching
+    setActivePage(1); // Reset to first page when searching
   };
 
   const handleCategoryChange = (value) => {
     setCategory(value);
-    setPage(1); // Reset to first page when changing category
+    setActivePage(1); // Reset to first page when changing category
   };
 
   const handleSortChange = (value) => {
     setSort(value);
-    setPage(1); // Reset to first page when changing sort
+    setActivePage(1); // Reset to first page when changing sort
+  };
+
+  // Filter causes based on status
+  const displayCauses = causes?.causes || [];
+  const activeCauses = displayCauses.filter(cause => cause.status === 'approved');
+  const completedCauses = displayCauses.filter(cause => cause.status === 'completed');
+
+  // Function to handle page change
+  const handlePageChange = (newPage) => {
+    setActivePage(newPage);
   };
 
   if (loading || causesLoading) {
@@ -260,83 +382,64 @@ const DonorDashboard = () => {
         </div>
       </div>
 
+      {/* Tab System */}
+      <div className="flex gap-4 mb-8">
+        <Button 
+          variant={activeTab === 'active' ? 'primary' : 'outline'}
+          onClick={() => setActiveTab('active')}
+        >
+          Active Causes ({activeCausesCount})
+        </Button>
+        <Button 
+          variant={activeTab === 'completed' ? 'primary' : 'outline'}
+          onClick={() => setActiveTab('completed')}
+        >
+          Completed Causes ({completedCausesCount})
+        </Button>
+      </div>
+
       {/* Causes Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {causes?.causes?.map((cause) => (
-          <Card key={cause._id} className="overflow-hidden">
-            <div className="relative h-48">
-              <img
-                src={cause.images?.[0] || '/placeholder.jpg'}
-                alt={cause.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute top-2 right-2 flex gap-2">
-                <Button
-                  variant={savedCauses.includes(cause._id) ? "default" : "secondary"}
-                  size="icon"
-                  className={`h-8 w-8 shadow-md ${
-                    savedCauses.includes(cause._id) 
-                      ? 'bg-red-500 hover:bg-red-600 text-white' 
-                      : 'bg-white hover:bg-gray-100 text-red-500'
-                  }`}
-                  onClick={() => handleSaveCause(cause._id)}
-                >
-                  <Heart 
-                    className="h-5 w-5" 
-                    fill={savedCauses.includes(cause._id) ? "currentColor" : "none"} 
-                  />
-                </Button>
-              </div>
-              <Badge className="absolute top-2 left-2">
-                {cause.category?.name}
-              </Badge>
-            </div>
-            <div className="p-4">
-              <h3 className="text-lg font-semibold mb-2">{cause.title}</h3>
-              <p className="text-sm text-gray-500 mb-4 line-clamp-2">
-                {cause.description}
-              </p>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Progress</span>
-                  <span>{Math.round(((cause.currentAmount || 0) / (cause.goalAmount || 1)) * 100)}%</span>
-                </div>
-                <Progress value={((cause.currentAmount || 0) / (cause.goalAmount || 1)) * 100} />
-                <div className="flex justify-between text-sm">
-                  <span>Raised: ₹{cause.currentAmount || 0}</span>
-                  <span>Goal: ₹{cause.goalAmount || 0}</span>
-                </div>
-                <Button 
-                  className="w-full mt-4"
-                  onClick={() => handleDonateClick(cause._id)}
-                >
-                  View Details
-                </Button>
-              </div>
-            </div>
-          </Card>
+        {activeTab === 'active' ? activeCauses.map((cause) => (
+          <CauseCard 
+            key={cause._id}
+            cause={cause}
+            savedCauses={savedCauses}
+            onSave={handleSaveCause}
+            onDonate={handleDonateClick}
+            onViewDetails={handleViewDetails}
+          />
+        )) : completedCauses.map((cause) => (
+          <CauseCard 
+            key={cause._id}
+            cause={cause}
+            savedCauses={savedCauses}
+            onSave={handleSaveCause}
+            onDonate={handleDonateClick}
+            onViewDetails={handleViewDetails}
+          />
         ))}
       </div>
 
       {/* Pagination */}
-      {causes?.totalPages > 1 && (
+      {activeTotalPages > 1 && (
         <div className="flex justify-center gap-2 mt-8">
           <Button
             variant="outline"
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
+            onClick={() => handlePageChange(Math.max(1, activePage - 1))}
+            disabled={activePage === 1}
           >
-            Previous
+            <ChevronLeft className="h-4 w-4 mr-1" /> Previous
           </Button>
           <span className="flex items-center px-4">
-            Page {page} of {causes.totalPages}
+            Page {activePage} of {activeTotalPages}
           </span>
           <Button
             variant="outline"
-            onClick={() => setPage(p => Math.min(causes.totalPages, p + 1))}
-            disabled={page === causes.totalPages}
+            onClick={() => handlePageChange(Math.min(activeTotalPages, activePage + 1))}
+            disabled={activePage === activeTotalPages}
           >
-            Next
+            Next <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         </div>
       )}
@@ -486,7 +589,7 @@ const DonorDashboard = () => {
                     <div>
                       <h3 className="text-xl font-semibold mb-2">Fundraising Progress</h3>
                       <Progress 
-                        value={((selectedCause.currentAmount || 0) / (selectedCause.goalAmount || 1)) * 100} 
+                        value={Math.min(((selectedCause.currentAmount || 0) / (selectedCause.goalAmount || 1)) * 100, 100)} 
                         className="h-2 mb-2"
                       />
                       <div className="flex justify-between text-sm">
@@ -549,4 +652,82 @@ const DonorDashboard = () => {
   );
 };
 
-export default DonorDashboard; 
+const CauseCard = ({ cause, savedCauses, onSave, onDonate, onViewDetails }) => {
+  const isCompleted = cause.status === 'completed';
+  const currentAmount = cause.currentAmount || 0;
+  const goalAmount = cause.goalAmount || 0;
+  const progress = Math.min(Math.round((currentAmount / (goalAmount || 1)) * 100), 100);
+  const isSaved = Array.isArray(savedCauses) && savedCauses.includes(cause._id);
+  
+  return (
+    <Card 
+      className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 cursor-pointer"
+      onClick={() => onDonate(cause._id)}
+    >
+      {/* Card Image */}
+      <div className="relative h-48 overflow-hidden">
+        <img 
+          src={cause.images?.[0] || '/placeholder-image.jpg'} 
+          alt={cause.title} 
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute top-2 right-2">
+          <button 
+            onClick={(e) => onSave(cause._id, e)}
+            className={`p-2 rounded-full ${isSaved ? 'bg-red-100 text-red-500' : 'bg-gray-100 text-gray-500'} hover:bg-opacity-90`}
+            aria-label={isSaved ? "Remove from saved" : "Save this cause"}
+          >
+            <Heart className={`h-5 w-5 ${isSaved ? 'fill-current' : ''}`} />
+          </button>
+        </div>
+        {isCompleted && (
+          <div className="absolute top-0 left-0 w-full bg-green-500 text-white text-center py-1 px-2">
+            Completed
+          </div>
+        )}
+      </div>
+      
+      {/* Card Content */}
+      <div className="p-4">
+        <div className="mb-2">
+          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+            {cause.category?.name || 'General'}
+          </Badge>
+        </div>
+        <h3 className="text-xl font-bold mb-2 line-clamp-2">{cause.title}</h3>
+        <p className="text-gray-600 mb-4 line-clamp-2">{cause.description}</p>
+        
+        {/* Progress Bar */}
+        <div className="mb-4">
+          <div className="flex justify-between text-sm mb-1">
+            <span className="font-medium">₹{currentAmount.toLocaleString()}</span>
+            <span className="text-gray-500">₹{goalAmount.toLocaleString()}</span>
+          </div>
+          <Progress value={progress} className="h-2" />
+          <div className="text-right text-sm mt-1 text-gray-500">{progress}% Funded</div>
+        </div>
+        
+        {/* Action Buttons */}
+        <div className="flex gap-2 mt-4">
+          {!isCompleted ? (
+            <Button 
+              onClick={(e) => {
+                e.stopPropagation();
+                onDonate(cause._id);
+              }}
+              className="w-full bg-blue-600 hover:bg-blue-700"
+            >
+              Donate Now
+            </Button>
+          ) : (
+            <div className="w-full text-center py-2 bg-gray-100 rounded-md text-gray-600">
+              This cause has been successfully funded
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+};
+
+export default DonorDashboard;

@@ -40,13 +40,14 @@ const CauseList = () => {
         (cause.status === 'approved' || cause.status === 'pending approval')
       );
     } else {
-      // For donors and others, show only approved causes
-      return causes.filter(cause => cause.status === 'approved');
+      // For donors and others, show both approved and completed causes
+      return causes.filter(cause => cause.status === 'approved' || cause.status === 'completed');
     }
   };
 
   const filteredCauses = getFilteredCauses();
   const approvedCauses = filteredCauses.filter(cause => cause.status === 'approved');
+  const completedCauses = filteredCauses.filter(cause => cause.status === 'completed');
   const pendingCauses = filteredCauses.filter(cause => cause.status === 'pending approval');
 
   const CauseCard = ({ cause }) => (
@@ -61,13 +62,13 @@ const CauseList = () => {
       <div className="p-4">
         <div className="flex justify-between items-center mb-2">
           <h3 className="text-xl font-semibold">{cause.title}</h3>
-          {user?.role === 'fundraiser' && (
-            <span className={`px-2 py-1 text-xs rounded-full capitalize ${
-              cause.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-            }`}>
-              {cause.status}
-            </span>
-          )}
+          <span className={`px-2 py-1 text-xs rounded-full capitalize ${
+            cause.status === 'approved' ? 'bg-green-100 text-green-800' : 
+            cause.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+            'bg-yellow-100 text-yellow-800'
+          }`}>
+            {cause.status}
+          </span>
         </div>
         
         <p className="text-muted-foreground mb-4 line-clamp-2">
@@ -76,20 +77,28 @@ const CauseList = () => {
 
         <div className="space-y-2 mb-4">
           <div className="flex justify-between text-sm">
-            <span>₹{cause.raisedAmount || 0}</span>
+            <span>₹{cause.currentAmount || 0}</span>
             <span>₹{cause.goalAmount}</span>
           </div>
-          <Progress value={calculateProgress(cause.raisedAmount || 0, cause.goalAmount)} />
+          <Progress value={calculateProgress(cause.currentAmount || 0, cause.goalAmount)} />
         </div>
 
         <div className="flex justify-between items-center text-sm text-muted-foreground">
           <span>By {cause.fundraiserId?.name}</span>
-          <span>{formatDistanceToNow(new Date(cause.endDate), { addSuffix: true })}</span>
+          <span>{cause.status === 'completed' ? 'Completed' : formatDistanceToNow(new Date(cause.endDate), { addSuffix: true })}</span>
         </div>
 
-        <Link to={`/causes/${cause._id}`} className="text-primary hover:underline">
-          View Details
-        </Link>
+        {cause.status !== 'completed' ? (
+          <Link to={`/causes/${cause._id}`} className="text-primary hover:underline">
+            View Details
+          </Link>
+        ) : (
+          <div className="mt-2 bg-blue-50 border border-blue-200 rounded-md p-2">
+            <p className="text-sm text-blue-700">
+              This cause has been successfully completed! Thank you for your support.
+            </p>
+          </div>
+        )}
       </div>
     </Card>
   );
@@ -150,12 +159,33 @@ const CauseList = () => {
           </TabsContent>
         </Tabs>
       ) : (
-        // Show simple grid for donors
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredCauses.map((cause) => (
-            <CauseCard key={cause._id} cause={cause} />
-          ))}
-        </div>
+        // Show tabs for donor view with completed causes
+        <Tabs defaultValue="active" className="w-full">
+          <TabsList className="mb-6">
+            <TabsTrigger value="active">
+              Active Causes ({approvedCauses.length})
+            </TabsTrigger>
+            <TabsTrigger value="completed">
+              Completed Causes ({completedCauses.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="active">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {approvedCauses.map((cause) => (
+                <CauseCard key={cause._id} cause={cause} />
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="completed">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {completedCauses.map((cause) => (
+                <CauseCard key={cause._id} cause={cause} />
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
       )}
 
       {(!filteredCauses || filteredCauses.length === 0) && (

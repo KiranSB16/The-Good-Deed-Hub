@@ -3,6 +3,7 @@ import Donation from '../models/donation-model.js';
 import Cause from '../models/cause-model.js';
 import Donor from '../models/donor-model.js';
 import mongoose from 'mongoose';
+import { notifyCauseCompletion } from '../utils/nodemailer.js';
 
 const paymentController = {};
 
@@ -25,10 +26,29 @@ paymentController.createPaymentIntent = async (req, res) => {
         if (cause.status !== 'approved') {
             return res.status(400).json({ message: 'Cannot donate to unapproved cause' });
         }
+        
+        // Check if cause has already reached its goal
+        if (cause.currentAmount >= cause.goalAmount) {
+            return res.status(400).json({ 
+                message: 'This cause has already reached its goal amount. Please consider supporting another cause.' 
+            });
+        }
 
         // Calculate platform fee (5%)
         const platformFee = Math.round(amount * 0.05);
-        const actualDonationAmount = amount - platformFee;  // Deduct platform fee from donation amount
+        const actualDonationAmount = amount - platformFee;
+        
+        // Check if this donation would exceed the goal amount
+        if (cause.currentAmount + actualDonationAmount > cause.goalAmount) {
+            // Suggest an amount that would exactly meet the goal
+            const suggestedAmount = cause.goalAmount - cause.currentAmount;
+            if (suggestedAmount >= 100) { // Only if suggested amount meets minimum
+                return res.status(400).json({ 
+                    message: `This donation would exceed the goal. The cause needs ₹${suggestedAmount} more to reach its goal.`,
+                    suggestedAmount
+                });
+            }
+        }
 
         // Create payment intent (amount in paise)
         const paymentIntent = await stripe.paymentIntents.create({
@@ -112,7 +132,7 @@ paymentController.handlePaymentSuccess = async (req, res) => {
 // Create a checkout session
 paymentController.createCheckoutSession = async (req, res) => {
     try {
-        const { amount, causeId, isAnonymous } = req.body;
+        const { amount, causeId, isAnonymous, message } = req.body;
 
         // Validate amount (minimum 100 INR)
         if (!amount || amount < 100) {
@@ -129,9 +149,36 @@ paymentController.createCheckoutSession = async (req, res) => {
             return res.status(400).json({ message: 'Cannot donate to unapproved cause' });
         }
 
+        // Check if cause has already reached its goal
+        if (cause.currentAmount >= cause.goalAmount) {
+            return res.status(400).json({ 
+                message: 'This cause has already reached its goal amount. Please consider supporting another cause.' 
+            });
+        }
+
         // Calculate platform fee (5%)
         const platformFee = Math.round(amount * 0.05);
         const actualDonationAmount = amount - platformFee;
+        
+        // Check if this donation would exceed the goal amount
+        if (cause.currentAmount + actualDonationAmount > cause.goalAmount) {
+            // Suggest an amount that would exactly meet the goal
+            const suggestedAmount = cause.goalAmount - cause.currentAmount;
+            if (suggestedAmount >= 100) { // Only if suggested amount meets minimum
+                return res.status(400).json({ 
+                    message: `This donation would exceed the goal. The cause needs ₹${suggestedAmount} more to reach its goal.`,
+                    suggestedAmount
+                });
+            }
+        }
+
+        console.log('Creating checkout session with parameters:', {
+            amount,
+            actualDonationAmount,
+            platformFee,
+            isAnonymous: Boolean(isAnonymous),
+            message: message || ''
+        });
 
         // Create Checkout Session
         const session = await stripe.checkout.sessions.create({
@@ -157,7 +204,8 @@ paymentController.createCheckoutSession = async (req, res) => {
                 donorId: req.user._id.toString(),
                 actualDonationAmount: actualDonationAmount.toString(),
                 platformFee: platformFee.toString(),
-                isAnonymous: (isAnonymous || false).toString()
+                isAnonymous: (isAnonymous || false).toString(),
+                message: (message || '').toString()
             },
             payment_intent_data: {
                 metadata: {
@@ -165,7 +213,8 @@ paymentController.createCheckoutSession = async (req, res) => {
                     donorId: req.user._id.toString(),
                     actualDonationAmount: actualDonationAmount.toString(),
                     platformFee: platformFee.toString(),
-                    isAnonymous: (isAnonymous || false).toString()
+                    isAnonymous: (isAnonymous || false).toString(),
+                    message: (message || '').toString()
                 }
             }
         });
@@ -267,11 +316,41 @@ paymentController.handleWebhook = async (req, res) => {
                                     throw new Error('Cause not found');
                                 }
 
+                                // Check if cause has reached its goal
+                                if (updatedCause.currentAmount >= updatedCause.goalAmount && updatedCause.status !== 'completed') {
+                                    // Update cause status to completed
+                                    updatedCause.status = 'completed';
+                                    await updatedCause.save({ session });
+                                    
+                                    // Send success email to fundraiser and donors
+                                    try {
+                                        // Get fundraiser email
+                                        const fundraiser = await mongoose.model('User').findById(updatedCause.fundraiserId);
+                                        
+                                        // Get all donors who donated to this cause
+                                        const donors = await Donation.find({ causeId: updatedCause._id, status: 'completed' })
+                                            .populate('donorId', 'userId')
+                                            .distinct('donorId');
+                                            
+                                        const donorUsers = await mongoose.model('User').find({
+                                            _id: { $in: donors.map(d => d.userId) }
+                                        });
+                                        
+                                        // Use the new notification function
+                                        const donorEmails = donorUsers.map(d => d.email).filter(Boolean);
+                                        await notifyCauseCompletion(fundraiser, updatedCause, donorEmails);
+                                    } catch (emailError) {
+                                        console.error('❌ Error sending goal completion emails:', emailError);
+                                        // Don't throw error here - we don't want to roll back the transaction if just email fails
+                                    }
+                                }
+
                                 console.log('✅ Cause amount updated:', {
                                     causeId: updatedCause._id,
                                     previousAmount: updatedCause.currentAmount - actualDonationAmount,
                                     donationAmount: actualDonationAmount,
-                                    newAmount: updatedCause.currentAmount
+                                    newAmount: updatedCause.currentAmount,
+                                    status: updatedCause.status
                                 });
 
                                 // Update donor's total donations
@@ -317,11 +396,41 @@ paymentController.handleWebhook = async (req, res) => {
                                 throw new Error('Cause not found');
                             }
 
+                            // Check if cause has reached its goal amount
+                            if (updatedCause.currentAmount >= updatedCause.goalAmount && updatedCause.status !== 'completed') {
+                                // Update cause status to completed
+                                updatedCause.status = 'completed';
+                                await updatedCause.save({ session });
+                                
+                                // Send success email to fundraiser and donors
+                                try {
+                                    // Get fundraiser email
+                                    const fundraiser = await mongoose.model('User').findById(updatedCause.fundraiserId);
+                                    
+                                    // Get all donors who donated to this cause
+                                    const donors = await Donation.find({ causeId: updatedCause._id, status: 'completed' })
+                                        .populate('donorId', 'userId')
+                                        .distinct('donorId');
+                                        
+                                    const donorUsers = await mongoose.model('User').find({
+                                        _id: { $in: donors.map(d => d.userId) }
+                                    });
+                                    
+                                    // Use the new notification function
+                                    const donorEmails = donorUsers.map(d => d.email).filter(Boolean);
+                                    await notifyCauseCompletion(fundraiser, updatedCause, donorEmails);
+                                } catch (emailError) {
+                                    console.error('❌ Error sending goal completion emails:', emailError);
+                                    // Don't throw error here - we don't want to roll back the transaction if just email fails
+                                }
+                            }
+
                             console.log('✅ Cause amount updated:', {
                                 causeId: updatedCause._id,
                                 previousAmount: updatedCause.currentAmount - actualDonationAmount,
                                 donationAmount: actualDonationAmount,
-                                newAmount: updatedCause.currentAmount
+                                newAmount: updatedCause.currentAmount,
+                                status: updatedCause.status
                             });
 
                             // Update donor's total donations
@@ -403,11 +512,44 @@ paymentController.handleWebhook = async (req, res) => {
                         await donation.save({ session: dbSession });
 
                         // Then update the cause's current amount
-                        await Cause.findByIdAndUpdate(
+                        const updatedCause = await Cause.findByIdAndUpdate(
                             metadata.causeId,
                             { $inc: { currentAmount: parseInt(metadata.actualDonationAmount) } },
-                            { session: dbSession }
+                            { new: true, session: dbSession }
                         );
+
+                        if (!updatedCause) {
+                            throw new Error('Cause not found');
+                        }
+
+                        // Check if cause has reached its goal amount
+                        if (updatedCause.currentAmount >= updatedCause.goalAmount && updatedCause.status !== 'completed') {
+                            // Update cause status to completed
+                            updatedCause.status = 'completed';
+                            await updatedCause.save({ session: dbSession });
+                            
+                            // Send success email to fundraiser and donors
+                            try {
+                                // Get fundraiser email
+                                const fundraiser = await mongoose.model('User').findById(updatedCause.fundraiserId);
+                                
+                                // Get all donors who donated to this cause
+                                const donors = await Donation.find({ causeId: updatedCause._id, status: 'completed' })
+                                    .populate('donorId', 'userId')
+                                    .distinct('donorId');
+                                    
+                                const donorUsers = await mongoose.model('User').find({
+                                    _id: { $in: donors.map(d => d.userId) }
+                                });
+                                
+                                // Use the new notification function
+                                const donorEmails = donorUsers.map(d => d.email).filter(Boolean);
+                                await notifyCauseCompletion(fundraiser, updatedCause, donorEmails);
+                            } catch (emailError) {
+                                console.error('❌ Error sending goal completion emails:', emailError);
+                                // Don't throw error here - we don't want to roll back the transaction if just email fails
+                            }
+                        }
 
                         // Update donor's total donations
                         await Donor.findByIdAndUpdate(
@@ -419,7 +561,8 @@ paymentController.handleWebhook = async (req, res) => {
                         console.log('✅ Donation completed successfully:', {
                             donationId: donation._id,
                             sessionId: session.id,
-                            amount: metadata.actualDonationAmount
+                            amount: metadata.actualDonationAmount,
+                            causeStatus: updatedCause.status
                         });
                     });
                     await dbSession.endSession();
@@ -648,11 +791,40 @@ paymentController.verifySession = async (req, res) => {
                     throw new Error('Cause not found');
                 }
 
+                // Check if cause has reached its goal amount
+                if (updatedCause.currentAmount >= updatedCause.goalAmount && updatedCause.status !== 'completed') {
+                    // Update cause status to completed
+                    updatedCause.status = 'completed';
+                    await updatedCause.save();
+                    
+                    // Send success email to fundraiser and donors
+                    try {
+                        // Get fundraiser email
+                        const fundraiser = await mongoose.model('User').findById(updatedCause.fundraiserId);
+                        
+                        // Get all donors who donated to this cause
+                        const donors = await Donation.find({ causeId: updatedCause._id, status: 'completed' })
+                            .populate('donorId', 'userId')
+                            .distinct('donorId');
+                            
+                        const donorUsers = await mongoose.model('User').find({
+                            _id: { $in: donors.map(d => d.userId) }
+                        });
+                        
+                        // Use the new notification function
+                        const donorEmails = donorUsers.map(d => d.email).filter(Boolean);
+                        await notifyCauseCompletion(fundraiser, updatedCause, donorEmails);
+                    } catch (emailError) {
+                        console.error('❌ Error sending goal completion emails:', emailError);
+                    }
+                }
+
                 console.log('✅ Cause amount updated:', {
                     causeId: updatedCause._id,
                     previousAmount: updatedCause.currentAmount - actualDonationAmount,
                     donationAmount: actualDonationAmount,
-                    newAmount: updatedCause.currentAmount
+                    newAmount: updatedCause.currentAmount,
+                    status: updatedCause.status
                 });
 
                 // Update donor's total donations

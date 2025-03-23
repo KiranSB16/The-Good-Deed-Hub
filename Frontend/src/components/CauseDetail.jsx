@@ -21,6 +21,8 @@ const CauseDetail = () => {
   const [showDonateDialog, setShowDonateDialog] = useState(false);
   const [donationAmount, setDonationAmount] = useState('');
   const [showPayment, setShowPayment] = useState(false);
+  const [showDonations, setShowDonations] = useState(false);
+  const [donations, setDonations] = useState([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -35,17 +37,33 @@ const CauseDetail = () => {
         }
         const response = await axios.get(`/causes/${id}`);
         setCause(response.data);
+        
+        // Fetch donations for all causes (both active and completed)
+        try {
+          const donationsResponse = await axios.get(`/causes/${id}/donations`);
+          setDonations(donationsResponse.data);
+          console.log('Donations data received:', donationsResponse.data);
+        } catch (donationError) {
+          console.error('Error fetching donations:', donationError);
+          toast.error('Failed to fetch donation details');
+        }
       } catch (error) {
         console.error('Error fetching cause:', error);
-        toast.error(error.response?.data?.message || 'Error fetching data');
-        navigate('/donor/dashboard');
+        
+        // Handle 403 Forbidden error specifically
+        if (error.response?.status === 403) {
+          toast.error('You do not have permission to view this cause');
+          navigate('/donor/dashboard');
+        } else {
+          toast.error(error.response?.data?.message || 'Error fetching data');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [id, navigate]);
+  }, [id, navigate, user]);
 
   const calculateProgress = (raised, goal) => {
     return Math.min((raised / goal) * 100, 100);
@@ -65,6 +83,15 @@ const CauseDetail = () => {
       toast.error('Please enter a valid amount (minimum ₹100)');
       return;
     }
+    
+    // Check if donation would exceed the goal amount
+    const remainingAmount = cause.goalAmount - cause.currentAmount;
+    if (amount > remainingAmount) {
+      toast.error(`This donation would exceed the goal. The cause needs ₹${remainingAmount.toLocaleString()} more to reach its goal.`);
+      setDonationAmount(remainingAmount.toString());
+      return;
+    }
+    
     setShowDonateDialog(false);
     setShowPayment(true);
   };
@@ -90,6 +117,12 @@ const CauseDetail = () => {
           if (updatedCause.currentAmount >= expectedAmount) {
             setCause(updatedCause);
             toast.success('Thank you for supporting this cause!');
+            
+            // If the cause is now completed, show a special message
+            if (updatedCause.status === 'completed') {
+              toast.success('Congratulations! This cause has reached its goal amount!');
+            }
+            
             break;
           }
           
@@ -148,11 +181,24 @@ const CauseDetail = () => {
             <div className="flex justify-between items-start mb-6">
               <h1 className="text-3xl font-bold">{cause.title}</h1>
               <span className={`px-3 py-1 rounded-full text-sm ${
-                cause.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                cause.status === 'approved' ? 'bg-green-100 text-green-800' : 
+                cause.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                'bg-yellow-100 text-yellow-800'
               }`}>
-                {cause.status}
+                {cause.status.charAt(0).toUpperCase() + cause.status.slice(1)}
               </span>
             </div>
+
+            {cause.status === 'completed' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-6">
+                <h3 className="font-bold text-blue-800 text-lg mb-2">🎉 Goal Successfully Reached!</h3>
+                <p className="text-blue-700">
+                  Thanks to the generosity of our donors, this cause has been fully funded.
+                  The impact of these donations will make a real difference in the lives of those in need.
+                  Thank you for being part of this journey!
+                </p>
+              </div>
+            )}
 
             {cause.images && cause.images.length > 0 && (
               <div className="mb-8">
@@ -193,7 +239,8 @@ const CauseDetail = () => {
               <p className="text-gray-700 whitespace-pre-wrap">{cause.description}</p>
             </div>
 
-            {cause.documents && cause.documents.length > 0 && (
+            {/* Only show supporting documents for non-completed causes */}
+            {cause.status !== 'completed' && cause.documents && cause.documents.length > 0 && (
               <div className="mb-8">
                 <h2 className="text-xl font-semibold mb-3">Supporting Documents</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -211,39 +258,81 @@ const CauseDetail = () => {
               </div>
             )}
 
-            <div className="grid md:grid-cols-2 gap-6 mb-8">
-              <div className="space-y-4">
-                <h2 className="text-xl font-semibold">Fundraiser Details</h2>
-                <div className="flex items-center gap-2">
-                  <User className="h-5 w-5 text-gray-500" />
-                  <span>Created by: {cause.fundraiserId?.name}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-gray-500" />
-                  <span>Start Date: {new Date(cause.startDate).toLocaleDateString()}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-gray-500" />
-                  <span>End Date: {new Date(cause.endDate).toLocaleDateString()}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Target className="h-5 w-5 text-gray-500" />
-                  <span>Category: {cause.category?.name || 'Uncategorized'}</span>
+            {/* Only show fundraiser details for non-completed causes */}
+            {cause.status !== 'completed' && (
+              <div className="grid md:grid-cols-2 gap-6 mb-8">
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold">Fundraiser Details</h2>
+                  <div className="flex items-center gap-2">
+                    <User className="h-5 w-5 text-gray-500" />
+                    <span>Created by: {cause.fundraiserId?.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-gray-500" />
+                    <span>Start Date: {new Date(cause.startDate).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-gray-500" />
+                    <span>End Date: {new Date(cause.endDate).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Target className="h-5 w-5 text-gray-500" />
+                    <span>Category: {cause.category?.name || 'Uncategorized'}</span>
+                  </div>
                 </div>
               </div>
+            )}
+
+            {/* For completed causes, just show basic info */}
+            {cause.status === 'completed' && (
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold mb-3">Cause Information</h2>
+                <p className="text-gray-700">
+                  <strong>Category:</strong> {cause.category?.name || 'Uncategorized'}
+                </p>
+                <p className="text-gray-700">
+                  <strong>Completed on:</strong> {new Date(cause.updatedAt).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+
+            {/* Donations Section - New addition */}
+            <div className="mb-8">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Donations</h2>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowDonations(!showDonations)}
+                  className="flex items-center gap-2"
+                >
+                  {showDonations ? 'Hide Donations' : 'See Donations'}
+                </Button>
+              </div>
+              
+              {showDonations && <DonationsList causeId={id} />}
             </div>
 
             <div className="flex justify-between items-center">
               <Button onClick={() => window.history.back()} variant="outline">
                 Back
               </Button>
-              {user?.role !== 'admin' && cause.status === 'approved' && (
+              {user?.role === 'donor' && cause.status === 'approved' && cause.currentAmount < cause.goalAmount && (
                 <Button 
                   onClick={handleDonateClick}
                   className="bg-primary hover:bg-primary/90"
                 >
                   Donate Now
                 </Button>
+              )}
+              {user?.role === 'donor' && cause.status === 'approved' && cause.currentAmount >= cause.goalAmount && (
+                <div className="px-4 py-2 bg-green-100 text-green-800 rounded-md">
+                  This cause has reached its goal! Thank you for your support.
+                </div>
+              )}
+              {cause.status === 'completed' && (
+                <div className="px-4 py-2 bg-blue-100 text-blue-800 rounded-md">
+                  This cause has been completed! Thank you for your support.
+                </div>
               )}
             </div>
           </div>
@@ -270,6 +359,11 @@ const CauseDetail = () => {
               <p className="text-sm text-muted-foreground">
                 Minimum donation amount is ₹100
               </p>
+              {cause && cause.currentAmount < cause.goalAmount && (
+                <p className="text-sm text-blue-600">
+                  Remaining amount to reach goal: ₹{(cause.goalAmount - cause.currentAmount).toLocaleString('en-IN')}
+                </p>
+              )}
             </div>
             <div className="flex justify-end space-x-2">
               <Button
@@ -304,6 +398,89 @@ const CauseDetail = () => {
           />
         </DialogContent>
       </Dialog>
+    </div>
+  );
+};
+
+const DonationsList = ({ causeId }) => {
+  const [donations, setDonations] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDonations = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get(`/donations/by-cause/${causeId}`);
+        console.log('Donations data received:', response.data);
+        setDonations(response.data || []);
+      } catch (error) {
+        console.error('Error fetching donations:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDonations();
+  }, [causeId]);
+
+  if (loading) {
+    return <div className="flex justify-center"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  }
+
+  if (donations.length === 0) {
+    return <p className="text-muted-foreground text-center">No donations yet. Be the first to donate!</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {donations.map((donation, index) => {
+        // Log each donation object for debugging
+        console.log(`Full donation ${index} object:`, donation);
+        
+        // Get donor name from all possible sources, prioritizing the most reliable sources
+        let donorName;
+        if (donation.isAnonymous === true) {
+          donorName = 'Anonymous Donor';
+        } else if (donation.donorName) {
+          donorName = donation.donorName;
+        } else if (donation.donorId?.userId?.name) {
+          donorName = donation.donorId.userId.name;
+        } else if (donation.donorId?.name) {
+          donorName = donation.donorId.name;
+        } else if (donation.name) {
+          donorName = donation.name;
+        } else if (donation.donor) {
+          donorName = donation.donor;
+        } else {
+          donorName = 'Anonymous Donor';
+        }
+        
+        console.log(`Donation ${index} donor:`, { 
+          donorName, 
+          isAnonymous: donation.isAnonymous,
+          hasId: !!donation.donorId,
+        });
+        
+        return (
+          <div key={donation._id || index} className="p-4 border rounded-lg bg-gray-50">
+            <div className="flex justify-between">
+              <div>
+                <span className="font-medium">
+                  {donorName}
+                </span>
+                <p className="text-sm text-muted-foreground">
+                  {new Date(donation.createdAt).toLocaleDateString()} • 
+                  {new Date(donation.createdAt).toLocaleTimeString()}
+                </p>
+              </div>
+              <div className="text-primary font-semibold">₹{donation.amount.toLocaleString('en-IN')}</div>
+            </div>
+            {donation.message && (
+              <p className="mt-2 text-sm italic">{donation.message}</p>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };

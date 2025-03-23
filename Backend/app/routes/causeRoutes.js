@@ -24,6 +24,9 @@ router.post('/',
 // List all causes
 router.get('/', AuthenticateUser, causeCltr.list);
 
+// Get cause counts by status
+router.get('/count', AuthenticateUser, causeCltr.count);
+
 // Get a single cause
 router.get('/:id', AuthenticateUser, causeCltr.show);
 

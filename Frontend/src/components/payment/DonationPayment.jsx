@@ -10,13 +10,16 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 
 const DonationPayment = ({ causeId, cause, onSuccess, onCancel, initialAmount }) => {
-  const [amount] = useState(initialAmount);
+  const [amount, setAmount] = useState(initialAmount);
   const [message, setMessage] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [platformFee] = useState(Math.round(initialAmount * 0.05));
   const [actualDonationAmount] = useState(initialAmount - Math.round(initialAmount * 0.05));
   const navigate = useNavigate();
+
+  // Calculate remaining amount to reach goal
+  const remainingAmount = cause?.goalAmount - (cause?.currentAmount || 0);
 
   const handleDonate = async () => {
     try {
@@ -38,7 +41,13 @@ const DonationPayment = ({ causeId, cause, onSuccess, onCancel, initialAmount })
       window.location.href = data.url;
     } catch (error) {
       console.error('Error creating checkout session:', error);
-      toast.error(error.response?.data?.message || 'Could not process donation. Please try again.');
+      const errorMessage = error.response?.data?.message || 'Could not process donation. Please try again.';
+      toast.error(errorMessage);
+      
+      // If there's a suggested amount, show it to the user
+      if (error.response?.data?.suggestedAmount) {
+        toast.error(`Suggested donation amount: ₹${error.response.data.suggestedAmount}`);
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -78,6 +87,11 @@ const DonationPayment = ({ causeId, cause, onSuccess, onCancel, initialAmount })
                 </div>
                 <span className="text-primary">₹{actualDonationAmount.toLocaleString('en-IN')}</span>
               </div>
+              {remainingAmount > 0 && (
+                <div className="mt-2 text-sm text-blue-600">
+                  Remaining amount to reach goal: ₹{remainingAmount.toLocaleString('en-IN')}
+                </div>
+              )}
             </div>
           </div>
 
